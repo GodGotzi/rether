@@ -1,0 +1,12 @@
+[package]
+name = "rether"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+wgpu = "22.0"
+glam = "0.28"
+log = "0.4.21"
+bytemuck = { version = "1.7.0", features = ["derive"] }
+parking_lot = "0.12.1"
+winit = "0.30.4"
