@@ -81,6 +81,7 @@ pub trait Expandable {
     fn expand(&mut self, other: &Self);
 }
 
+// maybe fix update bug
 #[derive(Debug, Clone)]
 pub enum TreeModel<T, C> {
     Root {
