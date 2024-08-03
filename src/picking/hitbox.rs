@@ -1,5 +1,3 @@
-use std::sync::{Arc, Mutex};
-
 use glam::Vec3;
 
 use crate::{
