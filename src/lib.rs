@@ -1,7 +1,8 @@
 mod buffer;
-mod light;
+pub mod light;
 mod model;
 pub mod picking;
+pub mod texture;
 pub mod vertex;
 
 pub use buffer::Buffer;
