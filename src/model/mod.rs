@@ -41,12 +41,12 @@ impl<T: Scale> Scale for [T] {
 }
 
 #[derive(Debug, Clone)]
-pub enum Geometry<const D: usize, const I: usize, T> {
-    Simple { vertices: [T; D] },
-    Indexed { indices: [u32; D], vertices: [T; D] },
+pub enum Geometry<T> {
+    Simple { vertices: Vec<T> },
+    Indexed { indices: Vec<u32>, vertices: Vec<T> },
 }
 
-impl<const D: usize, const I: usize, T: Translate> Translate for Geometry<D, I, T> {
+impl<T: Translate> Translate for Geometry<T> {
     fn translate(&mut self, translation: glam::Vec3) {
         match self {
             Self::Simple { vertices } => vertices.translate(translation),
@@ -55,7 +55,7 @@ impl<const D: usize, const I: usize, T: Translate> Translate for Geometry<D, I, 
     }
 }
 
-impl<const D: usize, const I: usize, T: Rotate> Rotate for Geometry<D, I, T> {
+impl<T: Rotate> Rotate for Geometry<T> {
     fn rotate(&mut self, rotation: glam::Quat) {
         match self {
             Self::Simple { vertices } => vertices.rotate(rotation),
@@ -64,7 +64,7 @@ impl<const D: usize, const I: usize, T: Rotate> Rotate for Geometry<D, I, T> {
     }
 }
 
-impl<const D: usize, const I: usize, T: Scale> Scale for Geometry<D, I, T> {
+impl<T: Scale> Scale for Geometry<T> {
     fn scale(&mut self, scale: glam::Vec3) {
         match self {
             Self::Simple { vertices } => vertices.scale(scale),
@@ -82,21 +82,21 @@ pub trait Expandable {
 }
 
 #[derive(Debug, Clone)]
-pub enum TreeModel<const D: usize, const I: usize, T, C> {
+pub enum TreeModel<T, C> {
     Root {
-        geometry: Geometry<D, I, T>,
-        sub_models: Vec<TreeModel<D, I, T, C>>,
+        geometry: Geometry<T>,
+        sub_models: Vec<TreeModel<T, C>>,
         ctx: C,
     },
     Node {
         location: BufferLocation,
-        sub_models: Vec<TreeModel<D, I, T, C>>,
+        sub_models: Vec<TreeModel<T, C>>,
         ctx: C,
     },
 }
 
-impl<const D: usize, const I: usize, T, C: Expandable> TreeModel<D, I, T, C> {
-    pub fn expand(&mut self, model: TreeModel<D, I, T, C>) {
+impl<T, C: Expandable> TreeModel<T, C> {
+    pub fn expand(&mut self, model: TreeModel<T, C>) {
         match self {
             Self::Root {
                 sub_models, ctx, ..
@@ -121,8 +121,8 @@ impl<const D: usize, const I: usize, T, C: Expandable> TreeModel<D, I, T, C> {
     }
 }
 
-impl<const D: usize, const I: usize, T: bytemuck::Pod + bytemuck::Zeroable + Clone, C>
-    IntoHandle<TreeHandle<C>> for TreeModel<D, I, T, C>
+impl<T: bytemuck::Pod + bytemuck::Zeroable + Clone, C> IntoHandle<TreeHandle<C>>
+    for TreeModel<T, C>
 {
     fn req_handle(self, allocation_id: BufferAllocationID) -> TreeHandle<C> {
         match self {
@@ -153,12 +153,8 @@ impl<const D: usize, const I: usize, T: bytemuck::Pod + bytemuck::Zeroable + Clo
     }
 }
 
-impl<
-        const D: usize,
-        const I: usize,
-        T: bytemuck::Pod + bytemuck::Zeroable + Clone + Translate,
-        C: Translate,
-    > Translate for TreeModel<D, I, T, C>
+impl<T: bytemuck::Pod + bytemuck::Zeroable + Clone + Translate, C: Translate> Translate
+    for TreeModel<T, C>
 {
     fn translate(&mut self, translation: glam::Vec3) {
         match self {
@@ -186,13 +182,7 @@ impl<
     }
 }
 
-impl<
-        const D: usize,
-        const I: usize,
-        T: bytemuck::Pod + bytemuck::Zeroable + Clone + Rotate,
-        C: Rotate,
-    > Rotate for TreeModel<D, I, T, C>
-{
+impl<T: bytemuck::Pod + bytemuck::Zeroable + Clone + Rotate, C: Rotate> Rotate for TreeModel<T, C> {
     fn rotate(&mut self, rotation: glam::Quat) {
         match self {
             Self::Root {
@@ -219,13 +209,7 @@ impl<
     }
 }
 
-impl<
-        const D: usize,
-        const I: usize,
-        T: bytemuck::Pod + bytemuck::Zeroable + Clone + Scale,
-        C: Scale,
-    > Scale for TreeModel<D, I, T, C>
-{
+impl<T: bytemuck::Pod + bytemuck::Zeroable + Clone + Scale, C: Scale> Scale for TreeModel<T, C> {
     fn scale(&mut self, scale: glam::Vec3) {
         match self {
             Self::Root {

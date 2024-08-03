@@ -202,7 +202,7 @@ impl<T: bytemuck::Pod + bytemuck::Zeroable, L: alloc::BufferAlloc<T>> Buffer<T, 
         }
     }
 
-    pub fn write<const S: usize>(&self, id: &str, geometry: &Geometry<S, 0, T>, queue: &wgpu::Queue)
+    pub fn write(&self, id: &str, geometry: &Geometry<T>, queue: &wgpu::Queue)
     where
         T: bytemuck::Pod + bytemuck::Zeroable,
     {
@@ -224,10 +224,10 @@ impl<T: bytemuck::Pod + bytemuck::Zeroable, L: alloc::BufferDynamicAlloc<T>> Buf
         self.raw.allocate::<T>(S, device, queue);
     }
 
-    pub fn allocate_init<const S: usize>(
+    pub fn allocate_init(
         &mut self,
         id: &str,
-        geometry: &Geometry<S, 0, T>,
+        geometry: &Geometry<T>,
         device: &Device,
         queue: &Queue,
     ) where
@@ -303,10 +303,10 @@ impl<
         I: alloc::BufferAlloc<u32>,
     > IndexedBuffer<T, L, I>
 {
-    pub fn write<const DS: usize, const IS: usize>(
+    pub fn writ<const DS: usize, const IS: usize>(
         &self,
         id: &str,
-        geometry: &Geometry<DS, IS, T>,
+        geometry: &Geometry<T>,
         queue: &wgpu::Queue,
     ) where
         T: bytemuck::Pod + bytemuck::Zeroable,
@@ -344,10 +344,10 @@ impl<
         self.index.allocate::<u32>(IS, device, queue);
     }
 
-    pub fn allocate_init<const DS: usize, const IS: usize>(
+    pub fn allocate_init(
         &mut self,
         id: &str,
-        geometry: &Geometry<DS, IS, T>,
+        geometry: &Geometry<T>,
         device: &Device,
         queue: &Queue,
     ) where
