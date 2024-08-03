@@ -3,38 +3,21 @@ use wgpu::{
     BufferAddress, BufferDescriptor, Device, Queue,
 };
 
+use crate::model::Geometry;
+
 pub mod alloc;
 
-#[allow(dead_code)]
-pub enum BufferRange {
-    Full,
-    OffsetFull(usize),
-    Range(std::ops::Range<usize>),
-}
-
-#[derive(Debug, Clone)]
-pub struct BufferLocation {
-    pub offset: usize,
-    pub size: usize,
-}
-
-impl From<BufferLocation> for BufferRange {
-    fn from(location: BufferLocation) -> Self {
-        BufferRange::Range(location.offset..(location.offset + location.size))
-    }
-}
-
 #[derive(Debug)]
-pub struct RawDynamicBuffer {
-    pub(super) inner: wgpu::Buffer,
-    pub(super) render_range: std::ops::Range<u32>,
+struct RawBuffer {
+    inner: wgpu::Buffer,
+    render_range: std::ops::Range<u32>,
 
     size: BufferAddress,
     label: String,
 }
 
-impl RawDynamicBuffer {
-    pub fn new<T>(size: usize, label: &str, device: &wgpu::Device) -> Self
+impl RawBuffer {
+    fn new<T>(size: usize, label: &str, device: &wgpu::Device) -> Self
     where
         T: bytemuck::Pod + bytemuck::Zeroable,
     {
@@ -56,8 +39,7 @@ impl RawDynamicBuffer {
         }
     }
 
-    #[allow(dead_code)]
-    pub fn new_init<T>(data: &[T], label: &str, device: &wgpu::Device) -> Self
+    fn new_init<T>(data: &[T], label: &str, device: &wgpu::Device) -> Self
     where
         T: bytemuck::Pod + bytemuck::Zeroable,
     {
@@ -78,8 +60,7 @@ impl RawDynamicBuffer {
         }
     }
 
-    #[allow(dead_code)]
-    pub fn allocate<T>(&mut self, size: usize, device: &wgpu::Device, queue: &wgpu::Queue)
+    fn allocate<T>(&mut self, size: usize, device: &wgpu::Device, queue: &wgpu::Queue)
     where
         T: bytemuck::Pod + bytemuck::Zeroable,
     {
@@ -109,7 +90,7 @@ impl RawDynamicBuffer {
         self.render_range = 0..self.size as u32;
     }
 
-    pub fn append<T>(&mut self, data: &[T], device: &wgpu::Device, queue: &wgpu::Queue)
+    fn append<T>(&mut self, data: &[T], device: &wgpu::Device, queue: &wgpu::Queue)
     where
         T: bytemuck::Pod + bytemuck::Zeroable,
     {
@@ -141,13 +122,8 @@ impl RawDynamicBuffer {
         self.render_range = 0..self.size as u32;
     }
 
-    pub fn free<T>(
-        &mut self,
-        offset: usize,
-        size: usize,
-        device: &wgpu::Device,
-        queue: &wgpu::Queue,
-    ) where
+    fn free<T>(&mut self, offset: usize, size: usize, device: &wgpu::Device, queue: &wgpu::Queue)
+    where
         T: bytemuck::Pod + bytemuck::Zeroable,
     {
         let old_bytes = self.size * std::mem::size_of::<T>() as BufferAddress;
@@ -188,7 +164,7 @@ impl RawDynamicBuffer {
         self.render_range = 0..self.size as u32;
     }
 
-    pub fn write<T>(&self, queue: &wgpu::Queue, offset: usize, data: &[T])
+    fn write<T>(&self, queue: &wgpu::Queue, offset: usize, data: &[T])
     where
         T: bytemuck::Pod + bytemuck::Zeroable,
     {
@@ -196,81 +172,85 @@ impl RawDynamicBuffer {
 
         queue.write_buffer(&self.inner, offset_bytes as u64, bytemuck::cast_slice(data));
     }
-
-    pub fn render<'a, 'b: 'a>(&'b self, render_pass: &'a mut wgpu::RenderPass<'b>) {
-        render_pass.set_vertex_buffer(0, self.inner.slice(..));
-        render_pass.draw(self.render_range.clone(), 0..1);
-    }
 }
 
 #[derive(Debug)]
-pub struct DynamicBuffer<T, L> {
-    inner: RawDynamicBuffer,
+pub struct Buffer<T, L> {
+    raw: RawBuffer,
     allocater: Box<L>,
     _phantom: std::marker::PhantomData<T>,
 }
 
-impl<T: bytemuck::Pod + bytemuck::Zeroable, L: alloc::BufferAlloc<T>> DynamicBuffer<T, L> {
+impl<T: bytemuck::Pod + bytemuck::Zeroable, L: alloc::BufferAlloc<T>> Buffer<T, L> {
     pub fn render<'a, 'b: 'a>(&'b self, render_pass: &'a mut wgpu::RenderPass<'b>) {
-        self.inner.render(render_pass);
+        render_pass.set_vertex_buffer(0, self.raw.inner.slice(..));
+        render_pass.draw(self.raw.render_range.clone(), 0..1);
     }
 }
 
-impl<T: bytemuck::Pod + bytemuck::Zeroable, L: alloc::BufferAlloc<T>> DynamicBuffer<T, L> {
+impl<T: bytemuck::Pod + bytemuck::Zeroable, L: alloc::BufferAlloc<T>> Buffer<T, L> {
     pub fn new(allocater: L, label: &str, device: &wgpu::Device) -> Self
     where
         T: bytemuck::Pod + bytemuck::Zeroable,
     {
-        let inner = RawDynamicBuffer::new::<T>(allocater.size(), label, device);
+        let inner = RawBuffer::new::<T>(allocater.size(), label, device);
 
         Self {
-            inner,
+            raw: inner,
             allocater: Box::new(allocater),
             _phantom: std::marker::PhantomData,
         }
     }
 
-    pub fn write(&self, queue: &wgpu::Queue, id: &str, data: &[T])
+    pub fn write<const S: usize>(&self, id: &str, geometry: &Geometry<S, 0, T>, queue: &wgpu::Queue)
     where
         T: bytemuck::Pod + bytemuck::Zeroable,
     {
-        if let Some(allocation) = self.allocater.get(id) {
-            self.inner.write(queue, allocation.offset, data);
+        if let Geometry::Simple { vertices } = geometry {
+            if let Some(allocation) = self.allocater.get(id) {
+                self.raw.write(queue, allocation.offset, vertices);
+            }
         }
     }
 }
 
-impl<T: bytemuck::Pod + bytemuck::Zeroable, L: alloc::BufferDynamicAlloc<T>> DynamicBuffer<T, L> {
-    #[allow(dead_code)]
-    pub fn allocate(&mut self, id: &str, size: usize, device: &Device, queue: &Queue)
+impl<T: bytemuck::Pod + bytemuck::Zeroable, L: alloc::BufferDynamicAlloc<T>> Buffer<T, L> {
+    pub fn allocate<const S: usize>(&mut self, id: &str, device: &Device, queue: &Queue)
     where
         T: bytemuck::Pod + bytemuck::Zeroable,
     {
-        self.allocater.allocate(id, size);
+        self.allocater.allocate(id, S);
 
-        self.inner.allocate::<T>(size, device, queue);
+        self.raw.allocate::<T>(S, device, queue);
     }
 
-    pub fn allocate_init(&mut self, id: &str, data: &[T], device: &Device, queue: &Queue)
-    where
+    pub fn allocate_init<const S: usize>(
+        &mut self,
+        id: &str,
+        geometry: &Geometry<S, 0, T>,
+        device: &Device,
+        queue: &Queue,
+    ) where
         T: bytemuck::Pod + bytemuck::Zeroable,
     {
-        self.allocater.allocate(id, data.len());
+        if let Geometry::Simple { vertices } = geometry {
+            self.allocater.allocate(id, vertices.len());
 
-        self.inner.append(data, device, queue);
+            self.raw.append(vertices, device, queue);
+        }
     }
 
     pub fn free(&mut self, id: &str, device: &Device, queue: &Queue) {
         if let Some(allocation) = self.allocater.free(id) {
-            self.inner
+            self.raw
                 .free::<T>(allocation.offset, allocation.size, device, queue);
         }
     }
 }
 
-pub struct IndexedDynamicBuffer<T, L, I> {
-    inner: RawDynamicBuffer,
-    index: RawDynamicBuffer,
+pub struct IndexedBuffer<T, L, I> {
+    inner: RawBuffer,
+    index: RawBuffer,
     allocater: Box<L>,
     allocator_index: Box<I>,
     _phantom: std::marker::PhantomData<T>,
@@ -280,31 +260,31 @@ impl<
         T: bytemuck::Pod + bytemuck::Zeroable,
         L: alloc::BufferAlloc<T>,
         I: alloc::BufferAlloc<u32>,
-    > IndexedDynamicBuffer<T, L, I>
+    > IndexedBuffer<T, L, I>
 {
     pub fn render<'a, 'b: 'a>(&'b self, render_pass: &'a mut wgpu::RenderPass<'b>) {
-        self.inner.render(render_pass);
+        render_pass.set_vertex_buffer(0, self.inner.inner.slice(..));
+        render_pass.set_index_buffer(self.index.inner.slice(..), wgpu::IndexFormat::Uint32);
+        render_pass.draw_indexed(0..self.index.size as u32, 0, 0..1);
     }
 }
 
 impl<
         T: bytemuck::Pod + bytemuck::Zeroable,
-        L: alloc::BufferAlloc<T>,
-        I: alloc::BufferAlloc<u32>,
-    > IndexedDynamicBuffer<T, L, I>
+        L: alloc::BufferAlloc<T> + Default,
+        I: alloc::BufferAlloc<u32> + Default,
+    > IndexedBuffer<T, L, I>
 {
-    pub fn new(
-        allocater: L,
-        allocator_index: I,
-        label: &str,
-        label_index: &str,
-        device: &wgpu::Device,
-    ) -> Self
+    pub fn new(label: &str, device: &wgpu::Device) -> Self
     where
         T: bytemuck::Pod + bytemuck::Zeroable,
     {
-        let inner = RawDynamicBuffer::new::<T>(allocater.size(), label, device);
-        let index = RawDynamicBuffer::new::<u32>(allocator_index.size(), label_index, device);
+        let allocater = L::default();
+        let allocator_index = I::default();
+
+        let inner = RawBuffer::new::<T>(allocater.size(), label, device);
+        let index =
+            RawBuffer::new::<u32>(allocator_index.size(), &format!("Index {}", label), device);
 
         Self {
             inner,
@@ -314,13 +294,82 @@ impl<
             _phantom: std::marker::PhantomData,
         }
     }
+}
 
-    pub fn write(&self, queue: &wgpu::Queue, id: &str, data: &[T])
-    where
+impl<
+        T: bytemuck::Pod + bytemuck::Zeroable,
+        L: alloc::BufferAlloc<T>,
+        I: alloc::BufferAlloc<u32>,
+    > IndexedBuffer<T, L, I>
+{
+    pub fn write<const DS: usize, const IS: usize>(
+        &self,
+        id: &str,
+        geometry: &Geometry<DS, IS, T>,
+        queue: &wgpu::Queue,
+    ) where
         T: bytemuck::Pod + bytemuck::Zeroable,
     {
-        if let Some(allocation) = self.allocater.get(id) {
-            self.inner.write(queue, allocation.offset, data);
+        if let Geometry::Indexed { indices, vertices } = geometry {
+            if let Some(allocation) = self.allocater.get(id) {
+                self.inner.write(queue, allocation.offset, vertices);
+            }
+
+            if let Some(allocation) = self.allocator_index.get(id) {
+                self.index.write(queue, allocation.offset, indices);
+            }
+        }
+    }
+}
+
+impl<
+        T: bytemuck::Pod + bytemuck::Zeroable,
+        L: alloc::BufferDynamicAlloc<T>,
+        I: alloc::BufferDynamicAlloc<u32>,
+    > IndexedBuffer<T, L, I>
+{
+    pub fn allocate<const DS: usize, const IS: usize>(
+        &mut self,
+        id: &str,
+        device: &Device,
+        queue: &Queue,
+    ) where
+        T: bytemuck::Pod + bytemuck::Zeroable,
+    {
+        self.allocater.allocate(id, DS);
+        self.allocator_index.allocate(id, IS);
+
+        self.inner.allocate::<T>(DS, device, queue);
+        self.index.allocate::<u32>(IS, device, queue);
+    }
+
+    pub fn allocate_init<const DS: usize, const IS: usize>(
+        &mut self,
+        id: &str,
+        geometry: &Geometry<DS, IS, T>,
+        device: &Device,
+        queue: &Queue,
+    ) where
+        T: bytemuck::Pod + bytemuck::Zeroable,
+    {
+        if let Geometry::Indexed { indices, vertices } = geometry {
+            self.allocater.allocate(id, vertices.len());
+            self.allocator_index.allocate(id, indices.len());
+
+            self.inner.append(vertices, device, queue);
+            self.index.append(indices, device, queue);
+        }
+    }
+
+    pub fn free(&mut self, id: &str, device: &Device, queue: &Queue) {
+        if let Some(allocation) = self.allocater.free(id) {
+            self.inner
+                .free::<T>(allocation.offset, allocation.size, device, queue);
+        }
+
+        if let Some(allocation) = self.allocator_index.free(id) {
+            self.index
+                .free::<u32>(allocation.offset, allocation.size, device, queue);
         }
     }
 }

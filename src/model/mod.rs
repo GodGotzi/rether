@@ -1,7 +1,7 @@
 use transform::{Rotate, Scale, Transform, Translate};
 
 use crate::{
-    buffer::{alloc::BufferAllocationID, BufferLocation},
+    buffer::alloc::BufferAllocationID,
     picking::{
         hitbox::{Hitbox, HitboxNode, InteractContext},
         interactive::Interactive,
@@ -10,9 +10,13 @@ use crate::{
 
 pub mod transform;
 
-pub type Vertices<T> = Vec<T>;
+#[derive(Debug, Clone)]
+pub struct BufferLocation {
+    pub offset: usize,
+    pub size: usize,
+}
 
-impl<T: Translate> Translate for Vertices<T> {
+impl<T: Translate> Translate for [T] {
     fn translate(&mut self, translation: glam::Vec3) {
         for item in self.iter_mut() {
             item.translate(translation);
@@ -20,7 +24,7 @@ impl<T: Translate> Translate for Vertices<T> {
     }
 }
 
-impl<T: Rotate> Rotate for Vertices<T> {
+impl<T: Rotate> Rotate for [T] {
     fn rotate(&mut self, rotation: glam::Quat) {
         for item in self.iter_mut() {
             item.rotate(rotation);
@@ -28,7 +32,7 @@ impl<T: Rotate> Rotate for Vertices<T> {
     }
 }
 
-impl<T: Scale> Scale for Vertices<T> {
+impl<T: Scale> Scale for [T] {
     fn scale(&mut self, scale: glam::Vec3) {
         for item in self.iter_mut() {
             item.scale(scale);
@@ -36,26 +40,36 @@ impl<T: Scale> Scale for Vertices<T> {
     }
 }
 
-#[derive(Debug)]
-pub struct Geometry<T> {
-    pub vertices: Vertices<T>,
+#[derive(Debug, Clone)]
+pub enum Geometry<const D: usize, const I: usize, T> {
+    Simple { vertices: [T; D] },
+    Indexed { indices: [u32; D], vertices: [T; D] },
 }
 
-impl<T: Translate> Translate for Geometry<T> {
+impl<const D: usize, const I: usize, T: Translate> Translate for Geometry<D, I, T> {
     fn translate(&mut self, translation: glam::Vec3) {
-        self.vertices.translate(translation);
+        match self {
+            Self::Simple { vertices } => vertices.translate(translation),
+            Self::Indexed { vertices, .. } => vertices.translate(translation),
+        }
     }
 }
 
-impl<T: Rotate> Rotate for Geometry<T> {
+impl<const D: usize, const I: usize, T: Rotate> Rotate for Geometry<D, I, T> {
     fn rotate(&mut self, rotation: glam::Quat) {
-        self.vertices.rotate(rotation);
+        match self {
+            Self::Simple { vertices } => vertices.rotate(rotation),
+            Self::Indexed { vertices, .. } => vertices.rotate(rotation),
+        }
     }
 }
 
-impl<T: Scale> Scale for Geometry<T> {
+impl<const D: usize, const I: usize, T: Scale> Scale for Geometry<D, I, T> {
     fn scale(&mut self, scale: glam::Vec3) {
-        self.vertices.scale(scale);
+        match self {
+            Self::Simple { vertices } => vertices.scale(scale),
+            Self::Indexed { vertices, .. } => vertices.scale(scale),
+        }
     }
 }
 
@@ -67,27 +81,22 @@ pub trait Expandable {
     fn expand(&mut self, other: &Self);
 }
 
-pub struct Object<T, C> {
-    geometry: Geometry<T>,
-    ctx: C,
-}
-
 #[derive(Debug, Clone)]
-pub enum TreeObject<T, C> {
+pub enum TreeModel<const D: usize, const I: usize, T, C> {
     Root {
-        geometry: Vertices<T>,
-        sub_models: Vec<TreeObject<T, C>>,
+        geometry: Geometry<D, I, T>,
+        sub_models: Vec<TreeModel<D, I, T, C>>,
         ctx: C,
     },
     Node {
         location: BufferLocation,
-        sub_models: Vec<TreeObject<T, C>>,
+        sub_models: Vec<TreeModel<D, I, T, C>>,
         ctx: C,
     },
 }
 
-impl<T, C: Expandable> TreeObject<T, C> {
-    pub fn expand(&mut self, model: TreeObject<T, C>) {
+impl<const D: usize, const I: usize, T, C: Expandable> TreeModel<D, I, T, C> {
+    pub fn expand(&mut self, model: TreeModel<D, I, T, C>) {
         match self {
             Self::Root {
                 sub_models, ctx, ..
@@ -110,26 +119,10 @@ impl<T, C: Expandable> TreeObject<T, C> {
             Self::Node { ctx, .. } => ctx,
         }
     }
-
-    pub fn push_data(&mut self, data: T) {
-        match self {
-            Self::Root { geometry, .. } => {
-                geometry.push(data);
-            }
-            Self::Node { .. } => {}
-        }
-    }
-
-    pub fn extend_data(&mut self, data: Vec<T>) {
-        match self {
-            Self::Root { geometry, .. } => geometry.extend(data),
-            Self::Node { .. } => {}
-        }
-    }
 }
 
-impl<T: bytemuck::Pod + bytemuck::Zeroable + Clone, C> IntoHandle<TreeHandle<C>>
-    for TreeObject<T, C>
+impl<const D: usize, const I: usize, T: bytemuck::Pod + bytemuck::Zeroable + Clone, C>
+    IntoHandle<TreeHandle<C>> for TreeModel<D, I, T, C>
 {
     fn req_handle(self, allocation_id: BufferAllocationID) -> TreeHandle<C> {
         match self {
@@ -160,8 +153,12 @@ impl<T: bytemuck::Pod + bytemuck::Zeroable + Clone, C> IntoHandle<TreeHandle<C>>
     }
 }
 
-impl<T: bytemuck::Pod + bytemuck::Zeroable + Clone + Translate, C: Translate> Translate
-    for TreeObject<T, C>
+impl<
+        const D: usize,
+        const I: usize,
+        T: bytemuck::Pod + bytemuck::Zeroable + Clone + Translate,
+        C: Translate,
+    > Translate for TreeModel<D, I, T, C>
 {
     fn translate(&mut self, translation: glam::Vec3) {
         match self {
@@ -189,8 +186,12 @@ impl<T: bytemuck::Pod + bytemuck::Zeroable + Clone + Translate, C: Translate> Tr
     }
 }
 
-impl<T: bytemuck::Pod + bytemuck::Zeroable + Clone + Rotate, C: Rotate> Rotate
-    for TreeObject<T, C>
+impl<
+        const D: usize,
+        const I: usize,
+        T: bytemuck::Pod + bytemuck::Zeroable + Clone + Rotate,
+        C: Rotate,
+    > Rotate for TreeModel<D, I, T, C>
 {
     fn rotate(&mut self, rotation: glam::Quat) {
         match self {
@@ -218,7 +219,13 @@ impl<T: bytemuck::Pod + bytemuck::Zeroable + Clone + Rotate, C: Rotate> Rotate
     }
 }
 
-impl<T: bytemuck::Pod + bytemuck::Zeroable + Clone + Scale, C: Scale> Scale for TreeObject<T, C> {
+impl<
+        const D: usize,
+        const I: usize,
+        T: bytemuck::Pod + bytemuck::Zeroable + Clone + Scale,
+        C: Scale,
+    > Scale for TreeModel<D, I, T, C>
+{
     fn scale(&mut self, scale: glam::Vec3) {
         match self {
             Self::Root {
@@ -299,10 +306,10 @@ impl<C: Interactive + Hitbox> Interactive for TreeHandle<C> {
         }
     }
 
-    fn mouse_delta(&mut self, button: winit::event::MouseButton, delta: glam::Vec2) {
+    fn mouse_motion(&mut self, button: winit::event::MouseButton, delta: glam::Vec2) {
         match self {
-            Self::Root { ctx, .. } => ctx.mouse_delta(button, delta),
-            Self::Node { ctx, .. } => ctx.mouse_delta(button, delta),
+            Self::Root { ctx, .. } => ctx.mouse_motion(button, delta),
+            Self::Node { ctx, .. } => ctx.mouse_motion(button, delta),
         }
     }
 

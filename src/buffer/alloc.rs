@@ -1,22 +1,5 @@
 use std::collections::HashMap;
 
-/*
-pub const HOVER_BOX_ALLOCATION: BufferAllocation = BufferAllocation {
-    offset: 0,
-    size: 12,
-};
-
-pub const SELECT_BOX_ALLOCATION: BufferAllocation = BufferAllocation {
-    offset: 12,
-    size: 12,
-};
-
-pub enum BufferLayoutType<T> {
-    Static(Box<dyn BufferAlloc<T>>),
-    Dynamic(Box<dyn BufferDynamicAlloc<T>>),
-}
-*/
-
 pub trait BufferAlloc<T> {
     fn get(&self, id: &str) -> Option<&BufferAllocation>;
     fn size(&self) -> usize;

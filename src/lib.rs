@@ -1,8 +1,8 @@
-mod buffer;
+pub mod buffer;
 mod light;
-mod model;
-mod picking;
+pub mod model;
+pub mod picking;
 mod shared;
-mod texture;
-mod vertex;
+pub mod texture;
+pub mod vertex;
 mod wrap;

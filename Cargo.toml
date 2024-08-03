@@ -10,3 +10,7 @@ log = "0.4.21"
 bytemuck = { version = "1.7.0", features = ["derive"] }
 parking_lot = "0.12.1"
 winit = "0.30.4"
+pollster = "0.3.0"
+
+[[bin]]
+name = "rether"

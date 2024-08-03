@@ -14,7 +14,7 @@ use super::{
 pub trait Interactive: Hitbox {
     fn mouse_clicked(&mut self, button: MouseButton) {}
     fn mouse_scroll(&mut self, delta: f32) {}
-    fn mouse_delta(&mut self, button: MouseButton, delta: Vec2) {}
+    fn mouse_motion(&mut self, button: MouseButton, delta: Vec2) {}
 }
 
 impl Translate for InteractContext {

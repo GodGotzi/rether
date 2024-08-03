@@ -8,3 +8,19 @@ pub mod ray;
 pub struct PickingContext {
     hitbox: HitboxNode,
 }
+
+impl PickingContext {
+
+    
+
+
+
+
+
+
+
+
+
+
+
+}
