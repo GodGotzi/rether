@@ -12,21 +12,21 @@ struct RawBuffer {
     inner: wgpu::Buffer,
     render_range: std::ops::Range<u32>,
 
+    usage: wgpu::BufferUsages,
+
     size: BufferAddress,
     label: String,
 }
 
 impl RawBuffer {
-    fn new<T>(size: usize, label: &str, device: &wgpu::Device) -> Self
+    fn new<T>(size: usize, label: &str, usage: wgpu::BufferUsages, device: &wgpu::Device) -> Self
     where
         T: bytemuck::Pod + bytemuck::Zeroable,
     {
         let inner = device.create_buffer(&BufferDescriptor {
             label: Some(label),
             size: (size * std::mem::size_of::<T>()) as BufferAddress,
-            usage: wgpu::BufferUsages::VERTEX
-                | wgpu::BufferUsages::COPY_DST
-                | wgpu::BufferUsages::COPY_SRC,
+            usage: usage | wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::COPY_SRC,
             mapped_at_creation: false,
         });
 
@@ -34,26 +34,33 @@ impl RawBuffer {
             inner,
             render_range: 0..size as u32,
 
+            usage,
+
             size: size as BufferAddress,
             label: label.to_string(),
         }
     }
 
-    fn new_init<T>(data: &[T], label: &str, device: &wgpu::Device) -> Self
+    fn new_init<T>(
+        data: &[T],
+        label: &str,
+        usage: wgpu::BufferUsages,
+        device: &wgpu::Device,
+    ) -> Self
     where
         T: bytemuck::Pod + bytemuck::Zeroable,
     {
         let inner = device.create_buffer_init(&BufferInitDescriptor {
             label: Some(label),
             contents: bytemuck::cast_slice(data),
-            usage: wgpu::BufferUsages::VERTEX
-                | wgpu::BufferUsages::COPY_DST
-                | wgpu::BufferUsages::COPY_SRC,
+            usage: usage | wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::COPY_SRC,
         });
 
         Self {
             inner,
             render_range: 0..data.len() as u32,
+
+            usage,
 
             size: data.len() as BufferAddress,
             label: label.to_string(),
@@ -69,9 +76,7 @@ impl RawBuffer {
         let buffer = device.create_buffer(&BufferDescriptor {
             label: Some(&self.label),
             size: old_bytes + (size * std::mem::size_of::<T>()) as BufferAddress,
-            usage: wgpu::BufferUsages::VERTEX
-                | wgpu::BufferUsages::COPY_DST
-                | wgpu::BufferUsages::COPY_SRC,
+            usage: self.usage | wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::COPY_SRC,
             mapped_at_creation: false,
         });
 
@@ -99,9 +104,7 @@ impl RawBuffer {
         let buffer = device.create_buffer(&BufferDescriptor {
             label: Some(&self.label),
             size: old_bytes + std::mem::size_of_val(data) as BufferAddress,
-            usage: wgpu::BufferUsages::VERTEX
-                | wgpu::BufferUsages::COPY_DST
-                | wgpu::BufferUsages::COPY_SRC,
+            usage: self.usage | wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::COPY_SRC,
             mapped_at_creation: false,
         });
 
@@ -131,9 +134,7 @@ impl RawBuffer {
         let buffer = device.create_buffer(&BufferDescriptor {
             label: Some(&self.label),
             size: old_bytes - (size * std::mem::size_of::<T>()) as BufferAddress,
-            usage: wgpu::BufferUsages::VERTEX
-                | wgpu::BufferUsages::COPY_DST
-                | wgpu::BufferUsages::COPY_SRC,
+            usage: self.usage | wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::COPY_SRC,
             mapped_at_creation: false,
         });
 
@@ -193,7 +194,8 @@ impl<T: bytemuck::Pod + bytemuck::Zeroable, L: alloc::BufferAlloc<T>> Buffer<T, 
     where
         T: bytemuck::Pod + bytemuck::Zeroable,
     {
-        let inner = RawBuffer::new::<T>(allocater.size(), label, device);
+        let inner =
+            RawBuffer::new::<T>(allocater.size(), label, wgpu::BufferUsages::VERTEX, device);
 
         Self {
             raw: inner,
@@ -283,9 +285,14 @@ impl<
         let allocater = L::default();
         let allocator_index = I::default();
 
-        let inner = RawBuffer::new::<T>(allocater.size(), label, device);
-        let index =
-            RawBuffer::new::<u32>(allocator_index.size(), &format!("Index {}", label), device);
+        let inner =
+            RawBuffer::new::<T>(allocater.size(), label, wgpu::BufferUsages::VERTEX, device);
+        let index = RawBuffer::new::<u32>(
+            allocator_index.size(),
+            &format!("Index {}", label),
+            wgpu::BufferUsages::VERTEX,
+            device,
+        );
 
         Self {
             inner,

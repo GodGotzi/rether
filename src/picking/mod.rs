@@ -9,18 +9,4 @@ pub struct PickingContext {
     hitbox: HitboxNode,
 }
 
-impl PickingContext {
-
-    
-
-
-
-
-
-
-
-
-
-
-
-}
+impl PickingContext {}
