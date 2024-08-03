@@ -248,6 +248,7 @@ impl<T: bytemuck::Pod + bytemuck::Zeroable, L: alloc::BufferDynamicAlloc<T>> Buf
     }
 }
 
+#[derive(Debug)]
 pub struct IndexedBuffer<T, L, I> {
     inner: RawBuffer,
     index: RawBuffer,
