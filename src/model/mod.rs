@@ -1,8 +1,14 @@
-use crate::buffer::alloc::BufferAllocationID;
+use transform::{Rotate, Scale, Translate};
 
+use crate::{alloc::BufferAllocationID, Geometry, Transform};
+
+mod base;
 pub mod geometry;
 pub mod transform;
-pub mod tree;
+mod tree;
+
+pub use base::{BaseHandle, BaseModel};
+pub use tree::{TreeHandle, TreeModel};
 
 #[derive(Debug, Clone)]
 pub struct BufferLocation {
@@ -10,8 +16,14 @@ pub struct BufferLocation {
     pub size: usize,
 }
 
-pub trait IntoHandle<T> {
-    fn req_handle(self, allocation_id: BufferAllocationID) -> T;
+pub trait Model<T, H: Handle> {
+    fn geometry(&self) -> &Geometry<T>;
+    fn into_handle(self, allocation_id: BufferAllocationID) -> H;
+}
+
+pub trait Handle: Translate + Rotate + Scale {
+    fn id(&self) -> &BufferAllocationID;
+    fn transform(&self) -> &Transform;
 }
 
 pub trait ModelContext: Expandable {}

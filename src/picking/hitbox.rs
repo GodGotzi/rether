@@ -1,13 +1,11 @@
 use glam::Vec3;
 
-use crate::model::transform::{Rotate, Scale, Translate}; // Importing the BoundingBox struct from the geometry module in the crate
-
 use super::{
     queue::{HitBoxQueueEntry, HitboxQueue},
     ray::Ray,
 };
 
-pub trait Hitbox: std::fmt::Debug + Send + Sync + Translate + Rotate + Scale {
+pub trait Hitbox: std::fmt::Debug + Send + Sync {
     fn check_hit(&self, ray: &Ray) -> Option<f32>;
     fn expand(&mut self, _box: &dyn Hitbox);
     fn set_enabled(&mut self, enabled: bool);
@@ -59,7 +57,7 @@ impl<C: Hitbox> HitboxNode<C> {
         }
     }
 
-    pub fn check_hit(&self, ray: &Ray) -> Option<&C> {
+    pub(super) fn check_hit(&self, ray: &Ray) -> Option<&C> {
         let mut queue = HitboxQueue::new(); // Creating a new HitboxQueue
 
         if let HitboxNode::Root { inner_hitboxes } = self {
@@ -94,7 +92,7 @@ impl<C: Hitbox> HitboxNode<C> {
         None
     }
 
-    pub fn add_node(&mut self, node: HitboxNode<C>) {
+    pub(super) fn add_node(&mut self, node: HitboxNode<C>) {
         match self {
             HitboxNode::Root { inner_hitboxes, .. } => {
                 inner_hitboxes.push(node);

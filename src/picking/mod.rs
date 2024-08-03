@@ -1,10 +1,14 @@
 mod hitbox;
+pub mod interact;
 mod queue;
 mod ray;
 
 pub use hitbox::{Hitbox, HitboxNode};
-
 pub use ray::Ray;
+
+pub trait IntoHitbox<C> {
+    fn into_hitbox(self) -> HitboxNode<C>;
+}
 
 pub struct PickingContext<C> {
     hitbox: HitboxNode<C>,
@@ -19,7 +23,9 @@ impl<C: Hitbox> Default for PickingContext<C> {
 }
 
 impl<C: Hitbox> PickingContext<C> {
-    pub fn add_hitbox(&mut self, node: HitboxNode<C>) {
+    pub fn add_handle<H: IntoHitbox<C>>(&mut self, handle: H) {
+        let node = handle.into_hitbox();
+
         self.hitbox.add_node(node);
     }
 
