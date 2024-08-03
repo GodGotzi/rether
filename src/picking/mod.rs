@@ -1,12 +1,29 @@
-use hitbox::HitboxNode;
+mod hitbox;
+mod queue;
+mod ray;
 
-pub mod hitbox;
-pub mod interactive;
-pub mod queue;
-pub mod ray;
+pub use hitbox::{Hitbox, HitboxNode};
 
-pub struct PickingContext {
-    hitbox: HitboxNode,
+pub use ray::Ray;
+
+pub struct PickingContext<C> {
+    hitbox: HitboxNode<C>,
 }
 
-impl PickingContext {}
+impl<C: Hitbox> Default for PickingContext<C> {
+    fn default() -> Self {
+        PickingContext {
+            hitbox: HitboxNode::root(),
+        }
+    }
+}
+
+impl<C: Hitbox> PickingContext<C> {
+    pub fn add_hitbox(&mut self, node: HitboxNode<C>) {
+        self.hitbox.add_node(node);
+    }
+
+    pub fn check_hit(&self, ray: &Ray) -> Option<&C> {
+        self.hitbox.check_hit(ray)
+    }
+}

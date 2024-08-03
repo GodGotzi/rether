@@ -1,12 +1,8 @@
 use glam::Vec3;
 
-use crate::{
-    model::transform::{Rotate, Scale, Translate},
-    shared::SharedMut,
-}; // Importing the BoundingBox struct from the geometry module in the crate
+use crate::model::transform::{Rotate, Scale, Translate}; // Importing the BoundingBox struct from the geometry module in the crate
 
 use super::{
-    interactive::Interactive,
     queue::{HitBoxQueueEntry, HitboxQueue},
     ray::Ray,
 };
@@ -20,37 +16,35 @@ pub trait Hitbox: std::fmt::Debug + Send + Sync + Translate + Rotate + Scale {
     fn max(&self) -> Vec3;
 }
 
-pub type InteractContext = SharedMut<Box<dyn Interactive>>;
-
 // Importing the Ray struct from the ray module in the super namespace
 // Function to check if a ray hits a hitbox node, returning an optional usize
 
 // Definition of the HitboxNode enum with Debug trait
 #[derive(Debug, Clone)]
-pub enum HitboxNode {
+pub enum HitboxNode<C> {
     // Variant for parent boxes containing other hitboxes and a bounding box
     Root {
-        inner_hitboxes: Vec<HitboxNode>,
+        inner_hitboxes: Vec<HitboxNode<C>>,
     },
     ParentBox {
-        inner_hitboxes: Vec<HitboxNode>,
-        ctx: InteractContext,
+        inner_hitboxes: Vec<HitboxNode<C>>,
+        ctx: C,
     },
     // Variant for individual boxes with a bounding box and an id
     Box {
-        ctx: InteractContext,
+        ctx: C,
     },
 }
 
 // Implementation of methods for HitboxNode
-impl HitboxNode {
+impl<C: Hitbox> HitboxNode<C> {
     pub fn root() -> Self {
         HitboxNode::Root {
             inner_hitboxes: Vec::new(),
         }
     }
 
-    pub fn parent_box(ctx: InteractContext, inner_hitboxes: Vec<HitboxNode>) -> Self {
+    pub fn parent_box(ctx: C, inner_hitboxes: Vec<HitboxNode<C>>) -> Self {
         HitboxNode::ParentBox {
             inner_hitboxes,
             ctx,
@@ -65,7 +59,7 @@ impl HitboxNode {
         }
     }
 
-    pub fn check_hit(&self, ray: &Ray) -> Option<&InteractContext> {
+    pub fn check_hit(&self, ray: &Ray) -> Option<&C> {
         let mut queue = HitboxQueue::new(); // Creating a new HitboxQueue
 
         if let HitboxNode::Root { inner_hitboxes } = self {
@@ -100,7 +94,7 @@ impl HitboxNode {
         None
     }
 
-    pub fn add_node(&mut self, node: HitboxNode) {
+    pub fn add_node(&mut self, node: HitboxNode<C>) {
         match self {
             HitboxNode::Root { inner_hitboxes, .. } => {
                 inner_hitboxes.push(node);

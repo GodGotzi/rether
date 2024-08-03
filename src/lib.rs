@@ -2,10 +2,7 @@ mod buffer;
 mod light;
 mod model;
 pub mod picking;
-mod shared;
-pub mod texture;
 pub mod vertex;
-mod wrap;
 
 pub use buffer::Buffer;
 pub use buffer::IndexedBuffer;

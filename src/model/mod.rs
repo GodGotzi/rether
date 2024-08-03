@@ -2,10 +2,7 @@ use transform::{Rotate, Scale, Transform, Translate};
 
 use crate::{
     buffer::alloc::BufferAllocationID,
-    picking::{
-        hitbox::{Hitbox, HitboxNode, InteractContext},
-        interactive::Interactive,
-    },
+    picking::{Hitbox, HitboxNode},
 };
 
 pub mod geometry;
@@ -225,8 +222,8 @@ pub enum TreeHandle<C> {
     },
 }
 
-impl Into<HitboxNode> for TreeHandle<InteractContext> {
-    fn into(self) -> HitboxNode {
+impl<T: Hitbox> Into<HitboxNode<T>> for TreeHandle<T> {
+    fn into(self) -> HitboxNode<T> {
         match self {
             Self::Root {
                 ctx, sub_handles, ..
@@ -256,31 +253,8 @@ impl Into<HitboxNode> for TreeHandle<InteractContext> {
     }
 }
 
-impl<C: Interactive + Hitbox> Interactive for TreeHandle<C> {
-    fn mouse_clicked(&mut self, button: winit::event::MouseButton) {
-        match self {
-            Self::Root { ctx, .. } => ctx.mouse_clicked(button),
-            Self::Node { ctx, .. } => ctx.mouse_clicked(button),
-        }
-    }
-
-    fn mouse_motion(&mut self, button: winit::event::MouseButton, delta: glam::Vec2) {
-        match self {
-            Self::Root { ctx, .. } => ctx.mouse_motion(button, delta),
-            Self::Node { ctx, .. } => ctx.mouse_motion(button, delta),
-        }
-    }
-
-    fn mouse_scroll(&mut self, delta: f32) {
-        match self {
-            Self::Root { ctx, .. } => ctx.mouse_scroll(delta),
-            Self::Node { ctx, .. } => ctx.mouse_scroll(delta),
-        }
-    }
-}
-
 impl<C: Hitbox> Hitbox for TreeHandle<C> {
-    fn check_hit(&self, ray: &crate::picking::ray::Ray) -> Option<f32> {
+    fn check_hit(&self, ray: &crate::picking::Ray) -> Option<f32> {
         match self {
             Self::Root { ctx, .. } => ctx.check_hit(ray),
             Self::Node { ctx, .. } => ctx.check_hit(ray),
