@@ -14,4 +14,4 @@ pub use model::transform;
 
 pub use model::geometry::Geometry;
 
-pub use model::{BufferLocation, Expandable, IntoHandle, TreeHandle, TreeModel};
+pub use model::{tree::TreeHandle, tree::TreeModel, BufferLocation, IntoHandle, ModelContext};
