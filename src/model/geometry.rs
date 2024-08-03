@@ -1,6 +1,6 @@
 use super::{
     transform::{Rotate, Scale, Translate},
-    ModelContext,
+    Expandable, ModelContext,
 };
 
 impl<T: Translate> Translate for [T] {
@@ -76,7 +76,9 @@ impl<T> Geometry<T> {
     }
 }
 
-impl<T: Clone> ModelContext for Geometry<T> {
+impl<T: Clone> ModelContext for Geometry<T> {}
+
+impl<T: Clone> Expandable for Geometry<T> {
     fn expand(&mut self, other: &Self) {
         match self {
             Self::Simple { vertices } => {

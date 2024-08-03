@@ -14,6 +14,8 @@ pub trait IntoHandle<T> {
     fn req_handle(self, allocation_id: BufferAllocationID) -> T;
 }
 
-pub trait ModelContext {
+pub trait ModelContext: Expandable {}
+
+pub trait Expandable {
     fn expand(&mut self, other: &Self);
 }

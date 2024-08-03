@@ -6,7 +6,7 @@ use crate::{
 
 use super::{
     transform::{Rotate, Scale, Transform, Translate},
-    BufferLocation, IntoHandle, ModelContext,
+    BufferLocation, Expandable, IntoHandle, ModelContext,
 };
 
 // maybe fix update bug
