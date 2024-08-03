@@ -189,11 +189,13 @@ impl<T: bytemuck::Pod + bytemuck::Zeroable, L: alloc::BufferAlloc<T>> Buffer<T, 
     }
 }
 
-impl<T: bytemuck::Pod + bytemuck::Zeroable, L: alloc::BufferAlloc<T>> Buffer<T, L> {
-    pub fn new(allocater: L, label: &str, device: &wgpu::Device) -> Self
+impl<T: bytemuck::Pod + bytemuck::Zeroable, L: alloc::BufferAlloc<T> + Default> Buffer<T, L> {
+    pub fn new(label: &str, device: &wgpu::Device) -> Self
     where
         T: bytemuck::Pod + bytemuck::Zeroable,
     {
+        let allocater = L::default();
+
         let inner =
             RawBuffer::new::<T>(allocater.size(), label, wgpu::BufferUsages::VERTEX, device);
 
