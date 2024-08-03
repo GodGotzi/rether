@@ -194,6 +194,7 @@ impl<T: bytemuck::Pod + bytemuck::Zeroable, L: alloc::BufferAlloc<T> + Default> 
     where
         T: bytemuck::Pod + bytemuck::Zeroable,
     {
+        // default allocater
         let allocater = L::default();
 
         let inner =
