@@ -3,7 +3,7 @@ use wgpu::{
     BufferAddress, BufferDescriptor, Device, Queue,
 };
 
-use crate::model::Geometry;
+use crate::model::geometry::Geometry;
 
 pub mod alloc;
 

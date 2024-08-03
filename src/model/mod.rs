@@ -8,69 +8,15 @@ use crate::{
     },
 };
 
+pub mod geometry;
 pub mod transform;
+
+use geometry::Geometry;
 
 #[derive(Debug, Clone)]
 pub struct BufferLocation {
     pub offset: usize,
     pub size: usize,
-}
-
-impl<T: Translate> Translate for [T] {
-    fn translate(&mut self, translation: glam::Vec3) {
-        for item in self.iter_mut() {
-            item.translate(translation);
-        }
-    }
-}
-
-impl<T: Rotate> Rotate for [T] {
-    fn rotate(&mut self, rotation: glam::Quat) {
-        for item in self.iter_mut() {
-            item.rotate(rotation);
-        }
-    }
-}
-
-impl<T: Scale> Scale for [T] {
-    fn scale(&mut self, scale: glam::Vec3) {
-        for item in self.iter_mut() {
-            item.scale(scale);
-        }
-    }
-}
-
-#[derive(Debug, Clone)]
-pub enum Geometry<T> {
-    Simple { vertices: Vec<T> },
-    Indexed { indices: Vec<u32>, vertices: Vec<T> },
-}
-
-impl<T: Translate> Translate for Geometry<T> {
-    fn translate(&mut self, translation: glam::Vec3) {
-        match self {
-            Self::Simple { vertices } => vertices.translate(translation),
-            Self::Indexed { vertices, .. } => vertices.translate(translation),
-        }
-    }
-}
-
-impl<T: Rotate> Rotate for Geometry<T> {
-    fn rotate(&mut self, rotation: glam::Quat) {
-        match self {
-            Self::Simple { vertices } => vertices.rotate(rotation),
-            Self::Indexed { vertices, .. } => vertices.rotate(rotation),
-        }
-    }
-}
-
-impl<T: Scale> Scale for Geometry<T> {
-    fn scale(&mut self, scale: glam::Vec3) {
-        match self {
-            Self::Simple { vertices } => vertices.scale(scale),
-            Self::Indexed { vertices, .. } => vertices.scale(scale),
-        }
-    }
 }
 
 pub trait IntoHandle<T> {
@@ -96,20 +42,26 @@ pub enum TreeModel<T, C> {
     },
 }
 
-impl<T, C: Expandable> TreeModel<T, C> {
+impl<T: Clone, C: Expandable> TreeModel<T, C> {
     pub fn expand(&mut self, model: TreeModel<T, C>) {
+        let (node, node_geometry) = model.into_node(0);
+
         match self {
             Self::Root {
-                sub_models, ctx, ..
+                sub_models,
+                ctx,
+                geometry,
+                ..
             } => {
-                ctx.expand(model.ctx());
-                sub_models.push(model);
+                geometry.expand(&node_geometry);
+                ctx.expand(node.ctx());
+                sub_models.push(node);
             }
             Self::Node {
                 sub_models, ctx, ..
             } => {
-                ctx.expand(model.ctx());
-                sub_models.push(model);
+                ctx.expand(node.ctx());
+                sub_models.push(node);
             }
         }
     }
@@ -118,6 +70,27 @@ impl<T, C: Expandable> TreeModel<T, C> {
         match self {
             Self::Root { ctx, .. } => ctx,
             Self::Node { ctx, .. } => ctx,
+        }
+    }
+
+    pub fn into_node(self, offset: usize) -> (TreeModel<T, C>, Geometry<T>) {
+        match self {
+            Self::Root {
+                geometry,
+                sub_models,
+                ctx,
+            } => (
+                TreeModel::Node {
+                    location: BufferLocation {
+                        offset,
+                        size: geometry.vertices().len(),
+                    },
+                    sub_models,
+                    ctx,
+                },
+                geometry,
+            ),
+            Self::Node { .. } => panic!("Cannot convert node to node"),
         }
     }
 }
