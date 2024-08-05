@@ -1,6 +1,12 @@
+use std::sync::atomic::AtomicBool;
+
+use parking_lot::Mutex;
 use transform::{Rotate, Scale, Translate};
 
-use crate::{alloc::BufferAllocationID, Geometry, Transform};
+use crate::{
+    alloc::{BufferAllocation, BufferAllocationID},
+    Geometry, Transform,
+};
 
 mod base;
 pub mod geometry;
@@ -9,6 +15,11 @@ mod tree;
 
 pub use base::{BaseHandle, BaseModel};
 pub use tree::{TreeHandle, TreeModel};
+
+pub struct AllocHandle {
+    destroyed: AtomicBool,
+    allocation: BufferAllocation,
+}
 
 #[derive(Debug, Clone)]
 pub struct BufferLocation {
