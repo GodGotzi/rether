@@ -10,14 +10,22 @@ use std::{
 type FnModifyData<T> = Box<dyn FnMut(&mut [T])>;
 
 pub struct ModifyAction<T> {
-    pub start: usize,
-    pub end: usize,
+    pub(crate) offset: usize,
+    pub(crate) size: usize,
     mod_action: FnModifyData<T>,
 }
 
 impl<T> ModifyAction<T> {
+    pub fn new(offset: usize, size: usize, mod_action: FnModifyData<T>) -> Self {
+        Self {
+            offset,
+            size,
+            mod_action,
+        }
+    }
+
     pub(super) fn act(&mut self, data: &mut [T]) {
-        (self.mod_action)(&mut data[self.start..=self.end]);
+        (self.mod_action)(data);
     }
 }
 
@@ -28,8 +36,7 @@ pub trait AllocHandle<T> {
     fn get_action_sender(&self) -> &Sender<ModifyAction<T>>;
 
     fn send_action(&self, mut action: ModifyAction<T>) -> Result<(), SendError<ModifyAction<T>>> {
-        action.start += self.offset();
-        action.end += self.offset();
+        action.offset += self.offset();
 
         self.get_action_sender().send(action)
     }
@@ -149,7 +156,7 @@ pub trait BufferAlloc<T> {
 pub trait BufferDynamicAlloc<T>: BufferAlloc<T, Handle = DynamicAllocHandle<T>> {
     fn allocate(&mut self, id: &str, size: usize) -> Arc<DynamicAllocHandle<T>>;
     fn free(&mut self, id: &str) -> Option<BufferAllocation>;
-    fn check_destroyed(&mut self);
+    fn get_destroyed_handles(&self) -> Vec<BufferAllocationID>;
 }
 
 #[derive(Debug)]
@@ -237,10 +244,8 @@ impl<T> BufferDynamicAlloc<T> for BufferDynamicAllocator<T> {
         }
     }
 
-    fn check_destroyed(&mut self) {
-        while let Ok(id) = self.destroy_requests.try_recv() {
-            self.free(&id);
-        }
+    fn get_destroyed_handles(&self) -> Vec<BufferAllocationID> {
+        self.destroy_requests.try_iter().collect()
     }
 }
 

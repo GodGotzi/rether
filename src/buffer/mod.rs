@@ -1,243 +1,48 @@
-use alloc::{AllocHandle, ModifyAction};
-use wgpu::{
-    util::{BufferInitDescriptor, DeviceExt},
-    BufferAddress, BufferDescriptor, Device, Queue,
-};
-
-use crate::model::geometry::Geometry;
-
 pub mod alloc;
+mod raw;
 
-#[derive(Debug)]
-struct RawBuffer {
-    inner: wgpu::Buffer,
-    render_range: std::ops::Range<u32>,
+use std::sync::Arc;
 
-    usage: wgpu::BufferUsages,
+use alloc::{AllocHandle, DynamicAllocHandle};
 
-    size: BufferAddress,
-    label: String,
+use raw::*;
+use wgpu::{Device, Queue};
+
+pub struct BufferData<'a, T> {
+    data: &'a [T],
 }
 
-impl RawBuffer {
-    fn new<T>(size: usize, label: &str, usage: wgpu::BufferUsages, device: &wgpu::Device) -> Self
-    where
-        T: bytemuck::Pod + bytemuck::Zeroable,
-    {
-        let inner = device.create_buffer(&BufferDescriptor {
-            label: Some(label),
-            size: (size * std::mem::size_of::<T>()) as BufferAddress,
-            usage: usage | wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::COPY_SRC,
-            mapped_at_creation: false,
-        });
+impl<'a> BufferData<'a, f32> {
+    pub fn create(data: &'a [f32]) -> Self {
+        Self { data }
+    }
+}
 
+pub struct IndexedBufferData<'a, T> {
+    data: &'a [T],
+    indices: &'a [u32],
+}
+
+impl<'a> IndexedBufferData<'a, f32> {
+    pub fn create(vertices: &'a [f32], indices: &'a [u32]) -> Self {
         Self {
-            inner,
-            render_range: 0..size as u32,
-
-            usage,
-
-            size: size as BufferAddress,
-            label: label.to_string(),
+            data: vertices,
+            indices,
         }
-    }
-
-    fn new_init<T>(
-        data: &[T],
-        label: &str,
-        usage: wgpu::BufferUsages,
-        device: &wgpu::Device,
-    ) -> Self
-    where
-        T: bytemuck::Pod + bytemuck::Zeroable,
-    {
-        let inner = device.create_buffer_init(&BufferInitDescriptor {
-            label: Some(label),
-            contents: bytemuck::cast_slice(data),
-            usage: usage | wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::COPY_SRC,
-        });
-
-        Self {
-            inner,
-            render_range: 0..data.len() as u32,
-
-            usage,
-
-            size: data.len() as BufferAddress,
-            label: label.to_string(),
-        }
-    }
-
-    fn allocate<T>(&mut self, size: usize, device: &wgpu::Device, queue: &wgpu::Queue)
-    where
-        T: bytemuck::Pod + bytemuck::Zeroable,
-    {
-        let old_bytes = self.size * std::mem::size_of::<T>() as BufferAddress;
-
-        let buffer = device.create_buffer(&BufferDescriptor {
-            label: Some(&self.label),
-            size: old_bytes + (size * std::mem::size_of::<T>()) as BufferAddress,
-            usage: self.usage | wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::COPY_SRC,
-            mapped_at_creation: false,
-        });
-
-        let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
-            label: Some("Buffer Copy Encoder"),
-        });
-        encoder.copy_buffer_to_buffer(&self.inner, 0, &buffer, 0, old_bytes);
-
-        queue.submit(std::iter::once(encoder.finish()));
-
-        self.inner.destroy();
-
-        self.inner = buffer;
-
-        self.size += size as BufferAddress;
-        self.render_range = 0..self.size as u32;
-    }
-
-    fn append<T>(&mut self, data: &[T], device: &wgpu::Device, queue: &wgpu::Queue)
-    where
-        T: bytemuck::Pod + bytemuck::Zeroable,
-    {
-        let old_bytes = self.size * std::mem::size_of::<T>() as BufferAddress;
-
-        let buffer = device.create_buffer(&BufferDescriptor {
-            label: Some(&self.label),
-            size: old_bytes + std::mem::size_of_val(data) as BufferAddress,
-            usage: self.usage | wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::COPY_SRC,
-            mapped_at_creation: false,
-        });
-
-        let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
-            label: Some("Buffer Copy Encoder"),
-        });
-        encoder.copy_buffer_to_buffer(&self.inner, 0, &buffer, 0, old_bytes);
-
-        queue.submit(std::iter::once(encoder.finish()));
-
-        queue.write_buffer(&buffer, old_bytes, bytemuck::cast_slice(data));
-
-        self.inner.destroy();
-
-        self.inner = buffer;
-
-        self.size += data.len() as BufferAddress;
-        self.render_range = 0..self.size as u32;
-    }
-
-    fn free<T>(&mut self, offset: usize, size: usize, device: &wgpu::Device, queue: &wgpu::Queue)
-    where
-        T: bytemuck::Pod + bytemuck::Zeroable,
-    {
-        let old_bytes = self.size * std::mem::size_of::<T>() as BufferAddress;
-
-        let buffer = device.create_buffer(&BufferDescriptor {
-            label: Some(&self.label),
-            size: old_bytes - (size * std::mem::size_of::<T>()) as BufferAddress,
-            usage: self.usage | wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::COPY_SRC,
-            mapped_at_creation: false,
-        });
-
-        let byte_offset = offset * std::mem::size_of::<T>();
-        let byte_size_to_free = size * std::mem::size_of::<T>();
-
-        let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
-            label: Some("Buffer Copy Encoder"),
-        });
-
-        encoder.copy_buffer_to_buffer(&self.inner, 0, &buffer, 0, byte_offset as BufferAddress);
-
-        encoder.copy_buffer_to_buffer(
-            &self.inner,
-            (byte_offset + byte_size_to_free) as BufferAddress,
-            &buffer,
-            byte_offset as BufferAddress,
-            old_bytes - (byte_offset + byte_size_to_free) as BufferAddress,
-        );
-
-        queue.submit(std::iter::once(encoder.finish()));
-
-        self.inner.destroy();
-
-        self.inner = buffer;
-
-        self.size -= size as BufferAddress;
-        self.render_range = 0..self.size as u32;
-    }
-
-    fn write<T>(&self, queue: &wgpu::Queue, offset: usize, data: &[T])
-    where
-        T: bytemuck::Pod + bytemuck::Zeroable,
-    {
-        let offset_bytes = offset * std::mem::size_of::<T>();
-
-        queue.write_buffer(&self.inner, offset_bytes as u64, bytemuck::cast_slice(data));
-    }
-
-    fn modify<T>(
-        &self,
-        mut modify_action: ModifyAction<T>,
-        device: &wgpu::Device,
-        queue: &wgpu::Queue,
-    ) where
-        T: bytemuck::Pod + bytemuck::Zeroable,
-    {
-        let offset_bytes = modify_action.start * std::mem::size_of::<T>();
-        let size = (modify_action.end - modify_action.start) * std::mem::size_of::<T>();
-
-        let read_buffer = device.create_buffer(&BufferDescriptor {
-            label: Some(&self.label),
-            size: size as BufferAddress,
-            usage: wgpu::BufferUsages::COPY_DST
-                | wgpu::BufferUsages::COPY_SRC
-                | wgpu::BufferUsages::MAP_READ,
-            mapped_at_creation: true,
-        });
-
-        let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
-            label: Some("Buffer Copy Encoder"),
-        });
-
-        encoder.copy_buffer_to_buffer(
-            &self.inner,
-            offset_bytes as BufferAddress,
-            &read_buffer,
-            0,
-            size as BufferAddress,
-        );
-
-        queue.submit(std::iter::once(encoder.finish()));
-
-        let raw_data = read_buffer.slice(..).get_mapped_range();
-        let mut data = bytemuck::cast_slice::<u8, T>(&raw_data)
-            .iter()
-            .copied()
-            .collect::<Vec<T>>();
-
-        drop(raw_data);
-
-        modify_action.act(&mut data);
-
-        queue.write_buffer(
-            &self.inner,
-            offset_bytes as BufferAddress,
-            bytemuck::cast_slice(&data),
-        );
     }
 }
 
 #[derive(Debug)]
 pub struct Buffer<T, L> {
-    raw: RawBuffer,
+    inner: RawBuffer,
     allocater: Box<L>,
     _phantom: std::marker::PhantomData<T>,
 }
 
 impl<T: bytemuck::Pod + bytemuck::Zeroable, L: alloc::BufferAlloc<T>> Buffer<T, L> {
     pub fn render<'a, 'b: 'a>(&'b self, render_pass: &'a mut wgpu::RenderPass<'b>) {
-        render_pass.set_vertex_buffer(0, self.raw.inner.slice(..));
-        render_pass.draw(self.raw.render_range.clone(), 0..1);
+        render_pass.set_vertex_buffer(0, self.inner.inner.slice(..));
+        render_pass.draw(self.inner.render_range.clone(), 0..1);
     }
 }
 
@@ -253,54 +58,72 @@ impl<T: bytemuck::Pod + bytemuck::Zeroable, L: alloc::BufferAlloc<T> + Default> 
             RawBuffer::new::<T>(allocater.size(), label, wgpu::BufferUsages::VERTEX, device);
 
         Self {
-            raw: inner,
+            inner,
             allocater: Box::new(allocater),
             _phantom: std::marker::PhantomData,
         }
     }
 
-    pub fn write(&self, id: &str, geometry: &Geometry<T>, queue: &wgpu::Queue)
+    pub fn write(&self, id: &str, buffer_data: BufferData<'_, T>, queue: &wgpu::Queue)
     where
         T: bytemuck::Pod + bytemuck::Zeroable,
     {
-        if let Geometry::Simple { vertices } = geometry {
-            if let Some(allocation) = self.allocater.get(id) {
-                self.raw.write(queue, allocation.offset(), vertices);
-            }
+        if let Some(allocation) = self.allocater.get(id) {
+            // assert!(buffer_data.data.len() <= allocation.size());
+
+            self.inner
+                .write(queue, allocation.offset(), buffer_data.data);
         }
     }
 }
 
 impl<T: bytemuck::Pod + bytemuck::Zeroable, L: alloc::BufferDynamicAlloc<T>> Buffer<T, L> {
-    pub fn allocate<const S: usize>(&mut self, id: &str, device: &Device, queue: &Queue)
+    pub fn allocate<const S: usize>(
+        &mut self,
+        id: &str,
+        device: &Device,
+        queue: &Queue,
+    ) -> Arc<DynamicAllocHandle<T>>
     where
         T: bytemuck::Pod + bytemuck::Zeroable,
     {
-        self.allocater.allocate(id, S);
+        let handle = self.allocater.allocate(id, S);
 
-        self.raw.allocate::<T>(S, device, queue);
+        self.inner.allocate::<T>(S, device, queue);
+
+        handle
     }
 
     pub fn allocate_init(
         &mut self,
         id: &str,
-        geometry: &Geometry<T>,
+        buffer_data: BufferData<'_, T>,
         device: &Device,
         queue: &Queue,
-    ) where
+    ) -> Arc<DynamicAllocHandle<T>>
+    where
         T: bytemuck::Pod + bytemuck::Zeroable,
     {
-        if let Geometry::Simple { vertices } = geometry {
-            self.allocater.allocate(id, vertices.len());
+        let handle = self.allocater.allocate(id, buffer_data.data.len());
 
-            self.raw.append(vertices, device, queue);
-        }
+        self.inner.append(buffer_data.data, device, queue);
+
+        handle
     }
 
     pub fn free(&mut self, id: &str, device: &Device, queue: &Queue) {
         if let Some(allocation) = self.allocater.free(id) {
-            self.raw
+            self.inner
                 .free::<T>(allocation.offset, allocation.size, device, queue);
+        }
+    }
+
+    pub fn update(&mut self, device: &Device, queue: &Queue) {
+        self.allocater
+            .update(|mod_action| self.inner.modify(mod_action, device, queue));
+
+        for id in self.allocater.get_destroyed_handles() {
+            self.free(&id, device, queue);
         }
     }
 }
@@ -373,19 +196,19 @@ where
     pub fn write<const DS: usize, const IS: usize>(
         &self,
         id: &str,
-        geometry: &Geometry<T>,
+        buffer_data: IndexedBufferData<'_, T>,
         queue: &wgpu::Queue,
     ) where
         T: bytemuck::Pod + bytemuck::Zeroable,
     {
-        if let Geometry::Indexed { indices, vertices } = geometry {
-            if let Some(allocation) = self.allocater.get(id) {
-                self.inner.write(queue, allocation.offset(), vertices);
-            }
+        if let Some(allocation) = self.allocater.get(id) {
+            self.inner
+                .write(queue, allocation.offset(), buffer_data.data);
+        }
 
-            if let Some(allocation) = self.allocator_index.get(id) {
-                self.index.write(queue, allocation.offset(), indices);
-            }
+        if let Some(allocation) = self.allocator_index.get(id) {
+            self.index
+                .write(queue, allocation.offset(), buffer_data.indices);
         }
     }
 }
@@ -414,19 +237,17 @@ where
     pub fn allocate_init(
         &mut self,
         id: &str,
-        geometry: &Geometry<T>,
+        buffer_data: IndexedBufferData<'_, T>,
         device: &Device,
         queue: &Queue,
     ) where
         T: bytemuck::Pod + bytemuck::Zeroable,
     {
-        if let Geometry::Indexed { indices, vertices } = geometry {
-            self.allocater.allocate(id, vertices.len());
-            self.allocator_index.allocate(id, indices.len());
+        self.allocater.allocate(id, buffer_data.data.len());
+        self.allocator_index.allocate(id, buffer_data.indices.len());
 
-            self.inner.append(vertices, device, queue);
-            self.index.append(indices, device, queue);
-        }
+        self.inner.append(buffer_data.data, device, queue);
+        self.index.append(buffer_data.data, device, queue);
     }
 
     pub fn free(&mut self, id: &str, device: &Device, queue: &Queue) {
@@ -442,8 +263,17 @@ where
     }
 
     pub fn update(&mut self, device: &Device, queue: &Queue) {
-        let modifier = |mod_action| self.inner.modify(mod_action, device, queue);
-        self.allocater.update(modifier);
+        self.allocater
+            .update(|mod_action| self.inner.modify(mod_action, device, queue));
+
+        let mut pending_destroyed_handles = self.allocater.get_destroyed_handles();
+
         self.allocator_index.update(|_| {});
+
+        pending_destroyed_handles.extend(self.allocator_index.get_destroyed_handles());
+
+        for id in pending_destroyed_handles {
+            self.free(&id, device, queue);
+        }
     }
 }
