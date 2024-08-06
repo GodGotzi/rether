@@ -16,11 +16,6 @@ mod tree;
 pub use base::{BaseHandle, BaseModel};
 pub use tree::{TreeHandle, TreeModel};
 
-pub struct AllocHandle {
-    destroyed: AtomicBool,
-    allocation: BufferAllocation,
-}
-
 #[derive(Debug, Clone)]
 pub struct BufferLocation {
     pub offset: usize,
