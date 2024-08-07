@@ -1,8 +1,12 @@
+use core::panic;
+
 use crate::{
     alloc::{AllocHandle, DynamicAllocHandle, ModifyAction, StaticAllocHandle},
     model::{BufferLocation, Model, ModelState},
     Rotate, Scale, Translate,
 };
+
+use super::{geometry::Geometry, Expandable};
 
 #[derive(Debug, Clone)]
 pub enum TreeModel<T, C, H: AllocHandle<T>> {
@@ -16,6 +20,109 @@ pub enum TreeModel<T, C, H: AllocHandle<T>> {
         sub_handles: Vec<TreeModel<T, C, H>>,
         ctx: C,
     },
+}
+
+impl<
+        C: Translate + Scale + Rotate + Expandable,
+        T: Translate + Scale + Rotate + Clone,
+        H: AllocHandle<T>,
+    > TreeModel<T, C, H>
+{
+    pub fn consume_expand(&mut self, other: Self) {
+        match self {
+            TreeModel::Root {
+                state: self_state,
+                sub_handles: self_sub_handles,
+                ctx: self_ctx,
+            } => match other {
+                TreeModel::Root {
+                    state,
+                    sub_handles,
+                    ctx,
+                } => {
+                    let (offset, size) = match self_state {
+                        ModelState::Dormant(geometry) => match state {
+                            ModelState::Dormant(other_geometry) => {
+                                let offset = geometry.data_len();
+
+                                geometry.expand(&other_geometry);
+
+                                (offset, other_geometry.data_len())
+                            }
+                            ModelState::DormantIndexed(_) => {
+                                panic!("Cannot expand a dormant geometry with an indexed geometry");
+                            }
+                            _ => panic!("Cannot expand an alive or dead handle"),
+                        },
+                        ModelState::DormantIndexed(geometry) => match state {
+                            ModelState::Dormant(_) => {
+                                panic!("Cannot expand a dormant geometry with an indexed geometry");
+                            }
+                            ModelState::DormantIndexed(other_geometry) => {
+                                let offset = geometry.data_len();
+
+                                geometry.expand(&other_geometry);
+
+                                (offset, other_geometry.data_len())
+                            }
+                            _ => panic!("Cannot expand an alive or dead handle"),
+                        },
+                        _ => panic!("Cannot expand an alive or dead handle"),
+                    };
+
+                    self_ctx.expand(&ctx);
+
+                    let node = TreeModel::Node {
+                        location: BufferLocation { offset, size },
+                        sub_handles,
+                        ctx,
+                    };
+
+                    self_sub_handles.push(node);
+                }
+                TreeModel::Node {
+                    location,
+                    sub_handles,
+                    ctx,
+                } => {
+                    self_ctx.expand(&ctx);
+
+                    let node = TreeModel::Node {
+                        location,
+                        sub_handles,
+                        ctx,
+                    };
+
+                    self_sub_handles.push(node);
+                }
+            },
+            TreeModel::Node {
+                location,
+                sub_handles: self_sub_handles,
+                ctx: self_ctx,
+            } => match other {
+                TreeModel::Node {
+                    location: mut other_location,
+                    sub_handles,
+                    ctx,
+                } => {
+                    self_ctx.expand(&ctx);
+
+                    other_location.offset += location.size;
+                    location.size += other_location.size;
+
+                    let node = TreeModel::Node {
+                        location: other_location,
+                        sub_handles,
+                        ctx,
+                    };
+
+                    self_sub_handles.push(node);
+                }
+                _ => panic!("Cannot expand a node with a root"),
+            },
+        }
+    }
 }
 
 impl<C: Translate + Scale + Rotate, T: Translate + Scale + Rotate> Model<T, StaticAllocHandle<T>>

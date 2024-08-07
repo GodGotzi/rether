@@ -100,7 +100,7 @@ pub struct IndexedGeometry<T> {
     indices: Vec<u32>,
 }
 
-impl<T> IndexedGeometry<T> {
+impl<T: Clone> IndexedGeometry<T> {
     pub fn empty() -> Self {
         Self {
             vertices: Vec::new(),
@@ -110,6 +110,10 @@ impl<T> IndexedGeometry<T> {
 
     pub fn init(vertices: Vec<T>, indices: Vec<u32>) -> Self {
         Self { vertices, indices }
+    }
+
+    pub fn into_simple(self) -> SimpleGeometry<T> {
+        SimpleGeometry::init(self.vertices)
     }
 }
 
