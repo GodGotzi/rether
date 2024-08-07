@@ -1,28 +1,26 @@
 use crate::{
     alloc::{AllocHandle, DynamicAllocHandle, ModifyAction, StaticAllocHandle},
-    model::{geometry::Geometry, BufferLocation, Model, ModelState},
+    model::{BufferLocation, Model, ModelState},
     picking::{Hitbox, HitboxNode, IntoHitbox},
     Rotate, Scale, Translate,
 };
 
 #[derive(Debug, Clone)]
-pub enum TreeModel<T, C, G: Geometry, H: AllocHandle<T>> {
+pub enum TreeModel<T, C, H: AllocHandle<T>> {
     Root {
-        state: ModelState<G, H>,
-        sub_handles: Vec<TreeModel<T, C, G, H>>,
+        state: ModelState<T, H>,
+        sub_handles: Vec<TreeModel<T, C, H>>,
         ctx: C,
-        _phantom: std::marker::PhantomData<T>,
     },
     Node {
         location: BufferLocation,
-        sub_handles: Vec<TreeModel<T, C, G, H>>,
+        sub_handles: Vec<TreeModel<T, C, H>>,
         ctx: C,
-        _phantom: std::marker::PhantomData<T>,
     },
 }
 
-impl<C: Translate + Scale + Rotate, T: Translate + Scale + Rotate, G: Geometry>
-    Model<T, G, StaticAllocHandle<T>> for TreeModel<T, C, G, StaticAllocHandle<T>>
+impl<C: Translate + Scale + Rotate, T: Translate + Scale + Rotate> Model<T, StaticAllocHandle<T>>
+    for TreeModel<T, C, StaticAllocHandle<T>>
 {
     fn make_alive(&mut self, handle: std::sync::Arc<StaticAllocHandle<T>>) {
         match self {
@@ -35,7 +33,7 @@ impl<C: Translate + Scale + Rotate, T: Translate + Scale + Rotate, G: Geometry>
         }
     }
 
-    fn state(&self) -> &ModelState<G, StaticAllocHandle<T>> {
+    fn state(&self) -> &ModelState<T, StaticAllocHandle<T>> {
         match self {
             Self::Root { state, .. } => state,
             Self::Node { .. } => panic!("Cannot get state from node"),
@@ -47,8 +45,8 @@ impl<C: Translate + Scale + Rotate, T: Translate + Scale + Rotate, G: Geometry>
     }
 }
 
-impl<C: Translate + Scale + Rotate, T: Translate + Scale + Rotate, G: Geometry>
-    Model<T, G, DynamicAllocHandle<T>> for TreeModel<T, C, G, DynamicAllocHandle<T>>
+impl<C: Translate + Scale + Rotate, T: Translate + Scale + Rotate> Model<T, DynamicAllocHandle<T>>
+    for TreeModel<T, C, DynamicAllocHandle<T>>
 {
     fn make_alive(&mut self, handle: std::sync::Arc<DynamicAllocHandle<T>>) {
         match self {
@@ -61,7 +59,7 @@ impl<C: Translate + Scale + Rotate, T: Translate + Scale + Rotate, G: Geometry>
         }
     }
 
-    fn state(&self) -> &crate::model::ModelState<G, DynamicAllocHandle<T>> {
+    fn state(&self) -> &crate::model::ModelState<T, DynamicAllocHandle<T>> {
         match self {
             Self::Root { state, .. } => state,
             Self::Node { .. } => panic!("Cannot get state from node"),
@@ -96,9 +94,7 @@ impl<C: Translate + Scale + Rotate, T: Translate + Scale + Rotate, G: Geometry>
     }
 }
 
-impl<T: Translate, C: Translate, G: Geometry, H: AllocHandle<T>> Translate
-    for TreeModel<T, C, G, H>
-{
+impl<T: Translate, C: Translate, H: AllocHandle<T>> Translate for TreeModel<T, C, H> {
     fn translate(&mut self, translation: glam::Vec3) {
         match self {
             Self::Root {
@@ -129,6 +125,15 @@ impl<T: Translate, C: Translate, G: Geometry, H: AllocHandle<T>> Translate
                         handle.translate(translation);
                     }
                 }
+                ModelState::DormantIndexed(geometry) => {
+                    geometry.translate(translation);
+
+                    ctx.translate(translation);
+
+                    for handle in sub_handles.iter_mut() {
+                        handle.translate(translation);
+                    }
+                }
                 _ => panic!("Cannot translate a dead handle"),
             },
             Self::Node {
@@ -144,47 +149,63 @@ impl<T: Translate, C: Translate, G: Geometry, H: AllocHandle<T>> Translate
     }
 }
 
-impl<T: Rotate, C: Rotate, G: Geometry, H: AllocHandle<T>> Rotate for TreeModel<T, C, G, H> {
+impl<T: Rotate, C: Rotate, H: AllocHandle<T>> Rotate for TreeModel<T, C, H> {
     fn rotate(&mut self, rotation: glam::Quat) {
         match self {
             Self::Root {
                 // transform,
                 sub_handles,
+                ctx,
                 ..
             } => {
                 // transform.rotate(rotation);
+                ctx.rotate(rotation);
                 for handle in sub_handles.iter_mut() {
                     handle.rotate(rotation);
                 }
             }
-            Self::Node { ctx, .. } => {
+            Self::Node {
+                ctx, sub_handles, ..
+            } => {
                 ctx.rotate(rotation);
+
+                for handle in sub_handles.iter_mut() {
+                    handle.rotate(rotation);
+                }
             }
         }
     }
 }
 
-impl<T: Scale, C: Scale, G: Geometry, H: AllocHandle<T>> Scale for TreeModel<T, C, G, H> {
+impl<T: Scale, C: Scale, H: AllocHandle<T>> Scale for TreeModel<T, C, H> {
     fn scale(&mut self, scale: glam::Vec3) {
         match self {
             Self::Root {
                 // transform,
                 sub_handles,
+                ctx,
                 ..
             } => {
                 // transform.scale(scale);
+                ctx.scale(scale);
                 for handle in sub_handles.iter_mut() {
                     handle.scale(scale);
                 }
             }
-            Self::Node { ctx, .. } => {
+            Self::Node {
+                ctx, sub_handles, ..
+            } => {
                 ctx.scale(scale);
+
+                for handle in sub_handles.iter_mut() {
+                    handle.scale(scale);
+                }
             }
         }
     }
 }
 
-impl<T, C: Hitbox, G: Geometry, H: AllocHandle<T>> IntoHitbox<C> for TreeModel<T, C, G, H> {
+impl<T, C: Hitbox, H: AllocHandle<T>> IntoHitbox<C> for TreeModel<T, C, H> {
     fn into_hitbox(self) -> crate::picking::HitboxNode<C> {
         match self {
             Self::Root {

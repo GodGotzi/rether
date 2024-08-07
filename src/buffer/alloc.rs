@@ -10,8 +10,8 @@ use std::{
 pub type FnModifyData<T> = Box<dyn FnMut(&mut [T])>;
 
 pub struct ModifyAction<T> {
-    pub(crate) offset: usize,
-    pub(crate) size: usize,
+    pub offset: usize,
+    pub size: usize,
     mod_action: FnModifyData<T>,
 }
 
@@ -24,7 +24,7 @@ impl<T> ModifyAction<T> {
         }
     }
 
-    pub(super) fn act(&mut self, data: &mut [T]) {
+    pub fn act(&mut self, data: &mut [T]) {
         (self.mod_action)(data);
     }
 }

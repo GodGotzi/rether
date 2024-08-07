@@ -1,7 +1,7 @@
 /// A vertex is a single point. A geometry is typically composed of multiple vertecies.
 use bytemuck::Zeroable;
 
-use crate::model::transform::Translate;
+use crate::{model::transform::Translate, Rotate, Scale};
 
 #[repr(C)]
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
@@ -49,5 +49,24 @@ impl Translate for Vertex {
         self.position[0] += translation.x;
         self.position[1] += translation.y;
         self.position[2] += translation.z;
+    }
+}
+
+impl Rotate for Vertex {
+    fn rotate(&mut self, rotation: glam::Quat) {
+        let rotation = glam::Mat3::from_quat(rotation);
+        let position = glam::Vec3::from(self.position);
+        let normal = glam::Vec3::from(self.normal);
+
+        self.position = (rotation * position).into();
+        self.normal = (rotation * normal).into();
+    }
+}
+
+impl Scale for Vertex {
+    fn scale(&mut self, scale: glam::Vec3) {
+        self.position[0] *= scale.x;
+        self.position[1] *= scale.y;
+        self.position[2] *= scale.z;
     }
 }

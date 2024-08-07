@@ -94,6 +94,7 @@ impl<T: Scale> Scale for SimpleGeometry<T> {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct IndexedGeometry<T> {
     vertices: Vec<T>,
     indices: Vec<u32>,

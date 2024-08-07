@@ -1,27 +1,45 @@
 use core::panic;
 
-use crate::alloc::{AllocHandle, DynamicAllocHandle, ModifyAction, StaticAllocHandle};
+use crate::{
+    alloc::{AllocHandle, DynamicAllocHandle, ModifyAction, StaticAllocHandle},
+    SimpleGeometry,
+};
 
 use super::{
-    geometry::Geometry,
+    geometry::IndexedGeometry,
     transform::{Rotate, Scale, Translate},
     Model, ModelState,
 };
 
-pub struct BaseModel<T, C, G: Geometry, H: AllocHandle<T>> {
-    state: ModelState<G, H>,
+pub struct BaseModel<T, C, H: AllocHandle<T>> {
+    state: ModelState<T, H>,
     ctx: C,
-    _phantom: std::marker::PhantomData<T>,
 }
 
-impl<C: Translate + Scale + Rotate, T: Translate + Scale + Rotate, G: Geometry>
-    Model<T, G, StaticAllocHandle<T>> for BaseModel<T, C, G, StaticAllocHandle<T>>
+impl<T, C, H: AllocHandle<T>> BaseModel<T, C, H> {
+    pub fn simple(ctx: C, geometry: SimpleGeometry<T>) -> Self {
+        Self {
+            state: ModelState::Dormant(geometry),
+            ctx,
+        }
+    }
+
+    pub fn indexed(ctx: C, geometry: IndexedGeometry<T>) -> Self {
+        Self {
+            state: ModelState::DormantIndexed(geometry),
+            ctx,
+        }
+    }
+}
+
+impl<C: Translate + Scale + Rotate, T: Translate + Scale + Rotate> Model<T, StaticAllocHandle<T>>
+    for BaseModel<T, C, StaticAllocHandle<T>>
 {
     fn make_alive(&mut self, handle: std::sync::Arc<StaticAllocHandle<T>>) {
         self.state = ModelState::Alive(handle);
     }
 
-    fn state(&self) -> &ModelState<G, StaticAllocHandle<T>> {
+    fn state(&self) -> &ModelState<T, StaticAllocHandle<T>> {
         &self.state
     }
 
@@ -30,14 +48,14 @@ impl<C: Translate + Scale + Rotate, T: Translate + Scale + Rotate, G: Geometry>
     }
 }
 
-impl<C: Translate + Scale + Rotate, T: Translate + Scale + Rotate, G: Geometry>
-    Model<T, G, DynamicAllocHandle<T>> for BaseModel<T, C, G, DynamicAllocHandle<T>>
+impl<C: Translate + Scale + Rotate, T: Translate + Scale + Rotate> Model<T, DynamicAllocHandle<T>>
+    for BaseModel<T, C, DynamicAllocHandle<T>>
 {
     fn make_alive(&mut self, handle: std::sync::Arc<DynamicAllocHandle<T>>) {
         self.state = ModelState::Alive(handle);
     }
 
-    fn state(&self) -> &ModelState<G, DynamicAllocHandle<T>> {
+    fn state(&self) -> &ModelState<T, DynamicAllocHandle<T>> {
         &self.state
     }
 
@@ -58,11 +76,10 @@ impl<C: Translate + Scale + Rotate, T: Translate + Scale + Rotate, G: Geometry>
 }
 
 // Translate, Rotate and Scale are implemented for BaseModel
-impl<C, T, G, H> Translate for BaseModel<T, C, G, H>
+impl<C, T, H> Translate for BaseModel<T, C, H>
 where
     C: Translate + Scale + Rotate,
     T: Translate + Scale + Rotate,
-    G: Geometry,
     H: AllocHandle<T>,
 {
     fn translate(&mut self, translation: glam::Vec3) {
@@ -86,11 +103,10 @@ where
     }
 }
 
-impl<C, T, G, H> Rotate for BaseModel<T, C, G, H>
+impl<C, T, H> Rotate for BaseModel<T, C, H>
 where
     C: Translate + Scale + Rotate,
     T: Translate + Scale + Rotate,
-    G: Geometry,
     H: AllocHandle<T>,
 {
     fn rotate(&mut self, rotation: glam::Quat) {
@@ -98,11 +114,10 @@ where
     }
 }
 
-impl<C, T, G, H> Scale for BaseModel<T, C, G, H>
+impl<C, T, H> Scale for BaseModel<T, C, H>
 where
     C: Translate + Scale + Rotate,
     T: Translate + Scale + Rotate,
-    G: Geometry,
     H: AllocHandle<T>,
 {
     fn scale(&mut self, scale: glam::Vec3) {
