@@ -1,76 +1,111 @@
-use crate::{
-    alloc::BufferAllocationID,
-    picking::{Hitbox, IntoHitbox},
-    Geometry,
-};
+use core::panic;
+
+use crate::alloc::{AllocHandle, DynamicAllocHandle, ModifyAction, StaticAllocHandle};
 
 use super::{
-    transform::{Rotate, Scale, Transform, Translate},
-    Handle, Model,
+    geometry::Geometry,
+    transform::{Rotate, Scale, Translate},
+    Model, ModelState,
 };
 
-pub struct BaseModel<T, C> {
-    geometry: Geometry<T>,
+pub struct BaseModel<T, C, G: Geometry, H: AllocHandle<T>> {
+    state: ModelState<G, H>,
     ctx: C,
+    _phantom: std::marker::PhantomData<T>,
 }
 
-impl<T, C> Model<T, BaseHandle<C>> for BaseModel<T, C>
-where
-    C: Translate + Rotate + Scale,
+impl<C: Translate + Scale + Rotate, T: Translate + Scale + Rotate, G: Geometry>
+    Model<T, G, StaticAllocHandle<T>> for BaseModel<T, C, G, StaticAllocHandle<T>>
 {
-    fn geometry(&self) -> &Geometry<T> {
-        &self.geometry
+    fn make_alive(&mut self, handle: std::sync::Arc<StaticAllocHandle<T>>) {
+        self.state = ModelState::Alive(handle);
     }
 
-    fn into_handle(self, allocation_id: BufferAllocationID) -> BaseHandle<C> {
-        BaseHandle {
-            id: allocation_id,
-            transform: Transform::default(),
-            ctx: self.ctx,
+    fn state(&self) -> &ModelState<G, StaticAllocHandle<T>> {
+        &self.state
+    }
+
+    fn destroy(&mut self) {
+        panic!("Static handle cannot be destroyed");
+    }
+}
+
+impl<C: Translate + Scale + Rotate, T: Translate + Scale + Rotate, G: Geometry>
+    Model<T, G, DynamicAllocHandle<T>> for BaseModel<T, C, G, DynamicAllocHandle<T>>
+{
+    fn make_alive(&mut self, handle: std::sync::Arc<DynamicAllocHandle<T>>) {
+        self.state = ModelState::Alive(handle);
+    }
+
+    fn state(&self) -> &ModelState<G, DynamicAllocHandle<T>> {
+        &self.state
+    }
+
+    fn destroy(&mut self) {
+        match self.state {
+            ModelState::Alive(ref handle) => {
+                handle.destroy();
+            }
+            _ => panic!("Cannot destroy a dead handle"),
+        };
+
+        self.state = ModelState::Destroyed;
+    }
+
+    fn is_destroyed(&self) -> bool {
+        self.state.is_destroyed()
+    }
+}
+
+// Translate, Rotate and Scale are implemented for BaseModel
+impl<C, T, G, H> Translate for BaseModel<T, C, G, H>
+where
+    C: Translate + Scale + Rotate,
+    T: Translate + Scale + Rotate,
+    G: Geometry,
+    H: AllocHandle<T>,
+{
+    fn translate(&mut self, translation: glam::Vec3) {
+        match self.state {
+            ModelState::Alive(ref mut handle) => {
+                let mod_action = Box::new(move |data: &mut [T]| data.translate(translation));
+
+                let action = ModifyAction::new(0, handle.size(), mod_action);
+
+                handle.send_action(action).expect("Failed to send action");
+
+                self.ctx.translate(translation);
+            }
+            ModelState::Dormant(ref mut geometry) => {
+                geometry.translate(translation);
+
+                self.ctx.translate(translation);
+            }
+            _ => panic!("Cannot translate a dead handle"),
         }
     }
 }
 
-#[derive(Debug)]
-pub struct BaseHandle<C> {
-    id: BufferAllocationID,
-    transform: Transform,
-    ctx: C,
-}
-
-impl<C: Translate + Scale + Rotate> Handle for BaseHandle<C> {
-    fn id(&self) -> &BufferAllocationID {
-        &self.id
-    }
-
-    fn transform(&self) -> &Transform {
-        &self.transform
-    }
-}
-
-impl<C: Translate> Translate for BaseHandle<C> {
-    fn translate(&mut self, translation: glam::Vec3) {
-        self.transform.translate(translation);
-        self.ctx.translate(translation);
-    }
-}
-
-impl<C: Rotate> Rotate for BaseHandle<C> {
+impl<C, T, G, H> Rotate for BaseModel<T, C, G, H>
+where
+    C: Translate + Scale + Rotate,
+    T: Translate + Scale + Rotate,
+    G: Geometry,
+    H: AllocHandle<T>,
+{
     fn rotate(&mut self, rotation: glam::Quat) {
-        self.transform.rotate(rotation);
         self.ctx.rotate(rotation);
     }
 }
 
-impl<C: Scale> Scale for BaseHandle<C> {
+impl<C, T, G, H> Scale for BaseModel<T, C, G, H>
+where
+    C: Translate + Scale + Rotate,
+    T: Translate + Scale + Rotate,
+    G: Geometry,
+    H: AllocHandle<T>,
+{
     fn scale(&mut self, scale: glam::Vec3) {
-        self.transform.scale(scale);
         self.ctx.scale(scale);
-    }
-}
-
-impl<C: Hitbox> IntoHitbox<C> for BaseHandle<C> {
-    fn into_hitbox(self) -> crate::picking::HitboxNode<C> {
-        crate::picking::HitboxNode::Box { ctx: self.ctx }
     }
 }

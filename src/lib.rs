@@ -10,6 +10,6 @@ pub use buffer::IndexedBuffer;
 
 pub use buffer::alloc;
 
-pub use model::geometry::Geometry;
+pub use model::geometry::SimpleGeometry;
 pub use model::transform::{Rotate, Scale, Transform, Translate};
 pub use model::ModelContext;

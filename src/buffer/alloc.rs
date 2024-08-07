@@ -7,7 +7,7 @@ use std::{
     },
 };
 
-type FnModifyData<T> = Box<dyn FnMut(&mut [T])>;
+pub type FnModifyData<T> = Box<dyn FnMut(&mut [T])>;
 
 pub struct ModifyAction<T> {
     pub(crate) offset: usize,
@@ -30,6 +30,7 @@ impl<T> ModifyAction<T> {
 }
 
 pub trait AllocHandle<T> {
+    fn id(&self) -> &BufferAllocationID;
     fn offset(&self) -> usize;
     fn size(&self) -> usize;
 
@@ -43,7 +44,7 @@ pub trait AllocHandle<T> {
 }
 
 pub struct StaticAllocHandle<T> {
-    pub id: String,
+    id: String,
     pub offset: usize,
     pub size: usize,
 
@@ -57,6 +58,10 @@ impl<T> std::hash::Hash for StaticAllocHandle<T> {
 }
 
 impl<T> AllocHandle<T> for StaticAllocHandle<T> {
+    fn id(&self) -> &BufferAllocationID {
+        &self.id
+    }
+
     fn offset(&self) -> usize {
         self.offset
     }
@@ -88,6 +93,10 @@ impl<T> std::hash::Hash for DynamicAllocHandle<T> {
 }
 
 impl<T> AllocHandle<T> for DynamicAllocHandle<T> {
+    fn id(&self) -> &BufferAllocationID {
+        &self.id
+    }
+
     fn offset(&self) -> usize {
         self.offset.load(std::sync::atomic::Ordering::Relaxed)
     }

@@ -1,6 +1,8 @@
+use crate::buffer::{BufferData, IndexedBufferData};
+
 use super::{
     transform::{Rotate, Scale, Translate},
-    Expandable, ModelContext,
+    Expandable,
 };
 
 impl<T: Translate> Translate for [T] {
@@ -27,106 +29,134 @@ impl<T: Scale> Scale for [T] {
     }
 }
 
+pub trait Geometry: Translate + Rotate + Scale + Expandable {
+    type Data<'a>
+    where
+        Self: 'a;
+
+    fn build_data(&self) -> Self::Data<'_>;
+    fn data_len(&self) -> usize;
+}
+
 #[derive(Debug, Clone)]
-pub enum Geometry<T> {
-    Simple { vertices: Vec<T> },
-    Indexed { indices: Vec<u32>, vertices: Vec<T> },
+pub struct SimpleGeometry<T> {
+    vertices: Vec<T>,
 }
 
-impl<T> Geometry<T> {
+impl<T> SimpleGeometry<T> {
     pub fn empty() -> Self {
-        Self::Simple {
+        Self {
             vertices: Vec::new(),
         }
     }
 
-    pub fn indexed_empty() -> Self {
-        Self::Indexed {
-            indices: Vec::new(),
-            vertices: Vec::new(),
-        }
-    }
-
-    pub fn vertices(&self) -> &[T] {
-        match self {
-            Self::Simple { vertices } => vertices,
-            Self::Indexed { vertices, .. } => vertices,
-        }
-    }
-
-    pub fn indices(&self) -> Option<&[u32]> {
-        match self {
-            Self::Simple { .. } => None,
-            Self::Indexed { indices, .. } => Some(indices),
-        }
-    }
-
-    pub fn push(&mut self, vertex: T) {
-        match self {
-            Self::Simple { vertices } => vertices.push(vertex),
-            Self::Indexed { vertices, .. } => vertices.push(vertex),
-        }
-    }
-
-    pub fn push_index(&mut self, index: u32) {
-        match self {
-            Self::Simple { .. } => {}
-            Self::Indexed { indices, .. } => indices.push(index),
-        }
+    pub fn init(vertices: Vec<T>) -> Self {
+        Self { vertices }
     }
 }
 
-impl<T: Clone> ModelContext for Geometry<T> {}
+impl<T> Geometry for SimpleGeometry<T>
+where
+    T: Translate + Rotate + Scale + Clone,
+{
+    type Data<'a> = BufferData<'a, T> where T: 'a;
 
-impl<T: Clone> Expandable for Geometry<T> {
+    fn build_data(&self) -> Self::Data<'_> {
+        BufferData::create(&self.vertices)
+    }
+
+    fn data_len(&self) -> usize {
+        self.vertices.len()
+    }
+}
+
+impl<T: Clone> Expandable for SimpleGeometry<T> {
     fn expand(&mut self, other: &Self) {
-        match self {
-            Self::Simple { vertices } => {
-                if let Self::Simple {
-                    vertices: other_vertices,
-                } = other
-                {
-                    vertices.extend_from_slice(other_vertices);
-                }
-            }
-            Self::Indexed { indices, vertices } => {
-                if let Self::Indexed {
-                    indices: other_indices,
-                    vertices: other_vertices,
-                } = other
-                {
-                    let offset = vertices.len() as u32;
-                    indices.extend(other_indices.iter().map(|i| i + offset));
-                    vertices.extend_from_slice(other_vertices);
-                }
-            }
-        }
+        self.vertices.extend_from_slice(&other.vertices);
     }
 }
 
-impl<T: Translate> Translate for Geometry<T> {
+impl<T: Translate> Translate for SimpleGeometry<T> {
     fn translate(&mut self, translation: glam::Vec3) {
-        match self {
-            Self::Simple { vertices } => vertices.translate(translation),
-            Self::Indexed { vertices, .. } => vertices.translate(translation),
-        }
+        self.vertices.translate(translation)
     }
 }
 
-impl<T: Rotate> Rotate for Geometry<T> {
+impl<T: Rotate> Rotate for SimpleGeometry<T> {
     fn rotate(&mut self, rotation: glam::Quat) {
-        match self {
-            Self::Simple { vertices } => vertices.rotate(rotation),
-            Self::Indexed { vertices, .. } => vertices.rotate(rotation),
-        }
+        self.vertices.rotate(rotation)
     }
 }
 
-impl<T: Scale> Scale for Geometry<T> {
+impl<T: Scale> Scale for SimpleGeometry<T> {
     fn scale(&mut self, scale: glam::Vec3) {
-        match self {
-            Self::Simple { vertices } => vertices.scale(scale),
-            Self::Indexed { vertices, .. } => vertices.scale(scale),
+        self.vertices.scale(scale)
+    }
+}
+
+pub struct IndexedGeometry<T> {
+    vertices: Vec<T>,
+    indices: Vec<u32>,
+}
+
+impl<T> IndexedGeometry<T> {
+    pub fn empty() -> Self {
+        Self {
+            vertices: Vec::new(),
+            indices: Vec::new(),
         }
+    }
+
+    pub fn init(vertices: Vec<T>, indices: Vec<u32>) -> Self {
+        Self { vertices, indices }
+    }
+}
+
+impl<T> Geometry for IndexedGeometry<T>
+where
+    T: Translate + Rotate + Scale + Clone,
+{
+    type Data<'a> = IndexedBufferData<'a, T> where T: 'a;
+
+    fn build_data(&self) -> Self::Data<'_> {
+        IndexedBufferData::create(&self.vertices, &self.indices)
+    }
+
+    fn data_len(&self) -> usize {
+        self.vertices.len()
+    }
+}
+
+impl<T: Clone> Expandable for IndexedGeometry<T> {
+    fn expand(&mut self, other: &Self) {
+        self.vertices.extend_from_slice(&other.vertices);
+
+        let offset = self.vertices.len() as u32;
+
+        let indices = other
+            .indices
+            .iter()
+            .map(|index| *index + offset)
+            .collect::<Vec<u32>>();
+
+        self.indices.extend_from_slice(&indices);
+    }
+}
+
+impl<T: Translate> Translate for IndexedGeometry<T> {
+    fn translate(&mut self, translation: glam::Vec3) {
+        self.vertices.translate(translation)
+    }
+}
+
+impl<T: Rotate> Rotate for IndexedGeometry<T> {
+    fn rotate(&mut self, rotation: glam::Quat) {
+        self.vertices.rotate(rotation)
+    }
+}
+
+impl<T: Scale> Scale for IndexedGeometry<T> {
+    fn scale(&mut self, scale: glam::Vec3) {
+        self.vertices.scale(scale)
     }
 }

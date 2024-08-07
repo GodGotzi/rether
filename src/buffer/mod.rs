@@ -12,8 +12,8 @@ pub struct BufferData<'a, T> {
     data: &'a [T],
 }
 
-impl<'a> BufferData<'a, f32> {
-    pub fn create(data: &'a [f32]) -> Self {
+impl<'a, T> BufferData<'a, T> {
+    pub fn create(data: &'a [T]) -> Self {
         Self { data }
     }
 }
@@ -23,8 +23,8 @@ pub struct IndexedBufferData<'a, T> {
     indices: &'a [u32],
 }
 
-impl<'a> IndexedBufferData<'a, f32> {
-    pub fn create(vertices: &'a [f32], indices: &'a [u32]) -> Self {
+impl<'a, T> IndexedBufferData<'a, T> {
+    pub fn create(vertices: &'a [T], indices: &'a [u32]) -> Self {
         Self {
             data: vertices,
             indices,
