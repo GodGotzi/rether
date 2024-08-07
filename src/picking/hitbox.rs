@@ -14,77 +14,50 @@ pub trait Hitbox: std::fmt::Debug + Send + Sync {
     fn max(&self) -> Vec3;
 }
 
+pub trait HitboxNode<M: HitboxNode<M>> {
+    fn hitbox(&self) -> &dyn Hitbox;
+    fn inner_models(&self) -> &[M];
+}
+
 // Importing the Ray struct from the ray module in the super namespace
 // Function to check if a ray hits a hitbox node, returning an optional usize
 
 // Definition of the HitboxNode enum with Debug trait
 #[derive(Debug, Clone)]
-pub enum HitboxNode<C> {
-    // Variant for parent boxes containing other hitboxes and a bounding box
-    Root {
-        inner_hitboxes: Vec<HitboxNode<C>>,
-    },
-    ParentBox {
-        inner_hitboxes: Vec<HitboxNode<C>>,
-        ctx: C,
-    },
-    // Variant for individual boxes with a bounding box and an id
-    Box {
-        ctx: C,
-    },
+pub struct HitboxRoot<M: HitboxNode<M>> {
+    inner_hitboxes: Vec<M>,
 }
 
 // Implementation of methods for HitboxNode
-impl<C: Hitbox> HitboxNode<C> {
+impl<M: HitboxNode<M>> HitboxRoot<M> {
     pub fn root() -> Self {
-        HitboxNode::Root {
+        Self {
             inner_hitboxes: Vec::new(),
         }
     }
 
-    pub fn parent_box(ctx: C, inner_hitboxes: Vec<HitboxNode<C>>) -> Self {
-        HitboxNode::ParentBox {
-            inner_hitboxes,
-            ctx,
-        }
-    }
-
-    fn hitbox(&self) -> &dyn Hitbox {
-        match self {
-            HitboxNode::ParentBox { ctx, .. } => ctx,
-            HitboxNode::Box { ctx } => ctx,
-            HitboxNode::Root { .. } => panic!("Root does not have a hitbox"),
-        }
-    }
-
-    pub(super) fn check_hit(&self, ray: &Ray) -> Option<&C> {
+    pub fn check_hit(&self, ray: &Ray) -> Option<&M> {
         let mut queue = HitboxQueue::new(); // Creating a new HitboxQueue
 
-        if let HitboxNode::Root { inner_hitboxes } = self {
-            for hitbox in inner_hitboxes {
-                let distance = hitbox.hitbox().check_hit(ray);
-                if let Some(distance) = distance {
-                    queue.push(HitBoxQueueEntry { hitbox, distance });
-                }
+        for hitbox in self.inner_hitboxes.iter() {
+            let distance = hitbox.hitbox().check_hit(ray);
+            if let Some(distance) = distance {
+                queue.push(HitBoxQueueEntry { hitbox, distance });
             }
         }
 
         while let Some(HitBoxQueueEntry { hitbox, .. }) = queue.pop() {
-            match hitbox {
-                // If hitbox is a ParentBox, check if the ray intersects the bounding box
-                HitboxNode::ParentBox { inner_hitboxes, .. }
-                | HitboxNode::Root { inner_hitboxes, .. } => {
-                    // If it intersects, recursively check inner hitboxes
-                    for hitbox in inner_hitboxes {
-                        let distance = hitbox.hitbox().check_hit(ray);
-                        if let Some(distance) = distance {
-                            queue.push(HitBoxQueueEntry { hitbox, distance });
-                        }
+            if hitbox.inner_models().is_empty() {
+                return Some(hitbox);
+            } else {
+                for inner_hitbox in hitbox.inner_models() {
+                    let distance = inner_hitbox.hitbox().check_hit(ray);
+                    if let Some(distance) = distance {
+                        queue.push(HitBoxQueueEntry {
+                            hitbox: inner_hitbox,
+                            distance,
+                        });
                     }
-                }
-                // If hitbox is a Box, check if the ray intersects its bounding box
-                HitboxNode::Box { ctx, .. } => {
-                    return Some(ctx);
                 }
             }
         }
@@ -92,23 +65,8 @@ impl<C: Hitbox> HitboxNode<C> {
         None
     }
 
-    pub(super) fn add_node(&mut self, node: HitboxNode<C>) {
-        match self {
-            HitboxNode::Root { inner_hitboxes, .. } => {
-                inner_hitboxes.push(node);
-            }
-            HitboxNode::ParentBox {
-                inner_hitboxes,
-                ctx: handle,
-                ..
-            } => {
-                handle.expand(node.hitbox());
-                inner_hitboxes.push(node);
-            }
-            HitboxNode::Box { .. } => {
-                panic!("Cannot add node to a box");
-            }
-        }
+    pub fn add_node(&mut self, node: M) {
+        self.inner_hitboxes.push(node);
     }
 }
 

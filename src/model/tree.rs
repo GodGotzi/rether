@@ -1,7 +1,6 @@
 use crate::{
     alloc::{AllocHandle, DynamicAllocHandle, ModifyAction, StaticAllocHandle},
     model::{BufferLocation, Model, ModelState},
-    picking::{Hitbox, HitboxNode, IntoHitbox},
     Rotate, Scale, Translate,
 };
 
@@ -199,37 +198,6 @@ impl<T: Scale, C: Scale, H: AllocHandle<T>> Scale for TreeModel<T, C, H> {
 
                 for handle in sub_handles.iter_mut() {
                     handle.scale(scale);
-                }
-            }
-        }
-    }
-}
-
-impl<T, C: Hitbox, H: AllocHandle<T>> IntoHitbox<C> for TreeModel<T, C, H> {
-    fn into_hitbox(self) -> crate::picking::HitboxNode<C> {
-        match self {
-            Self::Root {
-                ctx, sub_handles, ..
-            } => HitboxNode::parent_box(
-                ctx,
-                sub_handles
-                    .into_iter()
-                    .map(|handle| handle.into_hitbox())
-                    .collect(),
-            ),
-            Self::Node {
-                ctx, sub_handles, ..
-            } => {
-                if sub_handles.is_empty() {
-                    HitboxNode::Box { ctx }
-                } else {
-                    HitboxNode::parent_box(
-                        ctx,
-                        sub_handles
-                            .into_iter()
-                            .map(|handle| handle.into_hitbox())
-                            .collect(),
-                    )
                 }
             }
         }

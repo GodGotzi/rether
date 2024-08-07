@@ -168,9 +168,7 @@ impl RawBuffer {
         let read_buffer = device.create_buffer(&BufferDescriptor {
             label: Some("Read Buffer"),
             size: size_bytes as BufferAddress,
-            usage: wgpu::BufferUsages::COPY_DST
-                | wgpu::BufferUsages::COPY_SRC
-                | wgpu::BufferUsages::MAP_READ,
+            usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ,
             mapped_at_creation: true,
         });
 
@@ -203,8 +201,8 @@ impl RawBuffer {
             let raw_data = read_buffer.slice(..).get_mapped_range();
 
             let mut data = bytemuck::cast_slice::<u8, T>(&raw_data).to_vec();
-
             modify_action.act(&mut data);
+
             read_buffer.unmap();
             read_buffer.destroy();
 
