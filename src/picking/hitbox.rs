@@ -1,6 +1,7 @@
 use glam::Vec3;
 
 use super::{
+    interact::Interactive,
     queue::{HitBoxQueueEntry, HitboxQueue},
     ray::Ray,
 };
@@ -14,9 +15,9 @@ pub trait Hitbox: std::fmt::Debug + Send + Sync {
     fn max(&self) -> Vec3;
 }
 
-pub trait HitboxNode<M: HitboxNode<M>> {
+pub trait HitboxNode<M: HitboxNode<M>>: Interactive {
     fn hitbox(&self) -> &dyn Hitbox;
-    fn inner_models(&self) -> &[M];
+    fn inner_nodes(&self) -> &[M];
 }
 
 // Importing the Ray struct from the ray module in the super namespace
@@ -47,10 +48,10 @@ impl<M: HitboxNode<M>> HitboxRoot<M> {
         }
 
         while let Some(HitBoxQueueEntry { hitbox, .. }) = queue.pop() {
-            if hitbox.inner_models().is_empty() {
+            if hitbox.inner_nodes().is_empty() {
                 return Some(hitbox);
             } else {
-                for inner_hitbox in hitbox.inner_models() {
+                for inner_hitbox in hitbox.inner_nodes() {
                     let distance = inner_hitbox.hitbox().check_hit(ray);
                     if let Some(distance) = distance {
                         queue.push(HitBoxQueueEntry {
