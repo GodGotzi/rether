@@ -2,6 +2,7 @@ use core::panic;
 
 use crate::{
     alloc::{AllocHandle, DynamicAllocHandle, ModifyAction, StaticAllocHandle},
+    picking::{interact::Interactive, Hitbox, HitboxNode},
     SimpleGeometry,
 };
 
@@ -16,7 +17,10 @@ pub struct BaseModel<T, C, H: AllocHandle<T>> {
     ctx: C,
 }
 
-impl<T, C, H: AllocHandle<T>> BaseModel<T, C, H> {
+impl<T, C, H> BaseModel<T, C, H>
+where
+    H: AllocHandle<T>,
+{
     pub fn simple(ctx: C, geometry: SimpleGeometry<T>) -> Self {
         Self {
             state: ModelState::Dormant(geometry),
@@ -32,8 +36,44 @@ impl<T, C, H: AllocHandle<T>> BaseModel<T, C, H> {
     }
 }
 
-impl<C: Translate + Scale + Rotate, T: Translate + Scale + Rotate> Model<T, StaticAllocHandle<T>>
-    for BaseModel<T, C, StaticAllocHandle<T>>
+impl<T, C, H> HitboxNode<BaseModel<T, C, H>> for BaseModel<T, C, H>
+where
+    T: Translate + Scale + Rotate,
+    C: Translate + Scale + Rotate + Hitbox + Interactive,
+    H: AllocHandle<T>,
+{
+    fn hitbox(&self) -> &dyn crate::picking::Hitbox {
+        &self.ctx
+    }
+
+    fn inner_nodes(&self) -> &[BaseModel<T, C, H>] {
+        &[]
+    }
+}
+
+impl<T, C, H> Interactive for BaseModel<T, C, H>
+where
+    T: Translate + Scale + Rotate,
+    C: Translate + Scale + Rotate + Interactive,
+    H: AllocHandle<T>,
+{
+    fn mouse_clicked(&mut self, button: winit::event::MouseButton) {
+        self.ctx.mouse_clicked(button);
+    }
+
+    fn mouse_motion(&mut self, button: winit::event::MouseButton, delta: glam::Vec2) {
+        self.ctx.mouse_motion(button, delta);
+    }
+
+    fn mouse_scroll(&mut self, delta: f32) {
+        self.ctx.mouse_scroll(delta);
+    }
+}
+
+impl<T, C> Model<T, StaticAllocHandle<T>> for BaseModel<T, C, StaticAllocHandle<T>>
+where
+    T: Translate + Scale + Rotate,
+    C: Translate + Scale + Rotate,
 {
     fn make_alive(&mut self, handle: std::sync::Arc<StaticAllocHandle<T>>) {
         self.state = ModelState::Alive(handle);
@@ -48,8 +88,10 @@ impl<C: Translate + Scale + Rotate, T: Translate + Scale + Rotate> Model<T, Stat
     }
 }
 
-impl<C: Translate + Scale + Rotate, T: Translate + Scale + Rotate> Model<T, DynamicAllocHandle<T>>
-    for BaseModel<T, C, DynamicAllocHandle<T>>
+impl<T, C> Model<T, DynamicAllocHandle<T>> for BaseModel<T, C, DynamicAllocHandle<T>>
+where
+    T: Translate + Scale + Rotate,
+    C: Translate + Scale + Rotate,
 {
     fn make_alive(&mut self, handle: std::sync::Arc<DynamicAllocHandle<T>>) {
         self.state = ModelState::Alive(handle);
@@ -76,10 +118,10 @@ impl<C: Translate + Scale + Rotate, T: Translate + Scale + Rotate> Model<T, Dyna
 }
 
 // Translate, Rotate and Scale are implemented for BaseModel
-impl<C, T, H> Translate for BaseModel<T, C, H>
+impl<T, C, H> Translate for BaseModel<T, C, H>
 where
-    C: Translate + Scale + Rotate,
     T: Translate + Scale + Rotate,
+    C: Translate + Scale + Rotate,
     H: AllocHandle<T>,
 {
     fn translate(&mut self, translation: glam::Vec3) {
@@ -103,10 +145,10 @@ where
     }
 }
 
-impl<C, T, H> Rotate for BaseModel<T, C, H>
+impl<T, C, H> Rotate for BaseModel<T, C, H>
 where
-    C: Translate + Scale + Rotate,
     T: Translate + Scale + Rotate,
+    C: Translate + Scale + Rotate,
     H: AllocHandle<T>,
 {
     fn rotate(&mut self, rotation: glam::Quat) {
@@ -114,10 +156,10 @@ where
     }
 }
 
-impl<C, T, H> Scale for BaseModel<T, C, H>
+impl<T, C, H> Scale for BaseModel<T, C, H>
 where
-    C: Translate + Scale + Rotate,
     T: Translate + Scale + Rotate,
+    C: Translate + Scale + Rotate,
     H: AllocHandle<T>,
 {
     fn scale(&mut self, scale: glam::Vec3) {

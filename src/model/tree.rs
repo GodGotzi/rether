@@ -3,6 +3,7 @@ use core::panic;
 use crate::{
     alloc::{AllocHandle, DynamicAllocHandle, ModifyAction, StaticAllocHandle},
     model::{BufferLocation, Model, ModelState},
+    picking::{interact::Interactive, Hitbox, HitboxNode},
     Rotate, Scale, Translate,
 };
 
@@ -195,6 +196,58 @@ impl<C: Translate + Scale + Rotate, T: Translate + Scale + Rotate> Model<T, Dyna
             Self::Root { state, .. } => state.is_destroyed(),
             Self::Node { .. } => {
                 panic!("Cannot check if a node is destroyed");
+            }
+        }
+    }
+}
+
+impl<
+        T: Translate + Scale + Rotate,
+        C: Translate + Scale + Rotate + Hitbox + Interactive,
+        H: AllocHandle<T>,
+    > HitboxNode<TreeModel<T, C, H>> for TreeModel<T, C, H>
+{
+    fn hitbox(&self) -> &dyn crate::picking::Hitbox {
+        match self {
+            Self::Root { ctx, .. } => ctx,
+            Self::Node { ctx, .. } => ctx,
+        }
+    }
+
+    fn inner_nodes(&self) -> &[TreeModel<T, C, H>] {
+        match self {
+            Self::Root { sub_handles, .. } => sub_handles,
+            Self::Node { sub_handles, .. } => sub_handles,
+        }
+    }
+}
+
+impl<
+        T: Translate + Scale + Rotate,
+        C: Translate + Scale + Rotate + Interactive,
+        H: AllocHandle<T>,
+    > Interactive for TreeModel<T, C, H>
+{
+    fn mouse_clicked(&mut self, button: winit::event::MouseButton) {
+        match self {
+            Self::Root { ctx, .. } | Self::Node { ctx, .. } => {
+                ctx.mouse_clicked(button);
+            }
+        }
+    }
+
+    fn mouse_motion(&mut self, button: winit::event::MouseButton, delta: glam::Vec2) {
+        match self {
+            Self::Root { ctx, .. } | Self::Node { ctx, .. } => {
+                ctx.mouse_motion(button, delta);
+            }
+        }
+    }
+
+    fn mouse_scroll(&mut self, delta: f32) {
+        match self {
+            Self::Root { ctx, .. } | Self::Node { ctx, .. } => {
+                ctx.mouse_scroll(delta);
             }
         }
     }
