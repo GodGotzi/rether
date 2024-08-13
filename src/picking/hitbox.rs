@@ -1,7 +1,6 @@
 use glam::Vec3;
 
 use super::{
-    interact::Interactive,
     queue::{HitBoxQueueEntry, HitboxQueue},
     ray::Ray,
 };
@@ -15,7 +14,7 @@ pub trait Hitbox: std::fmt::Debug + Send + Sync {
     fn max(&self) -> Vec3;
 }
 
-pub trait HitboxNode<M: HitboxNode<M>>: Interactive {
+pub trait HitboxNode<M: HitboxNode<M>> {
     fn hitbox(&self) -> &dyn Hitbox;
     fn inner_nodes(&self) -> &[M];
 }

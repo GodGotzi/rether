@@ -23,11 +23,11 @@ pub enum TreeModel<T, C, H: AllocHandle<T>> {
     },
 }
 
-impl<
-        C: Translate + Scale + Rotate + Expandable,
-        T: Translate + Scale + Rotate + Clone,
-        H: AllocHandle<T>,
-    > TreeModel<T, C, H>
+impl<T, C, H> TreeModel<T, C, H>
+where
+    T: Translate + Scale + Rotate + Clone,
+    C: Translate + Scale + Rotate + Expandable,
+    H: AllocHandle<T>,
 {
     pub fn consume_expand(&mut self, other: Self) {
         match self {
@@ -126,8 +126,10 @@ impl<
     }
 }
 
-impl<C: Translate + Scale + Rotate, T: Translate + Scale + Rotate> Model<T, StaticAllocHandle<T>>
-    for TreeModel<T, C, StaticAllocHandle<T>>
+impl<T, C> Model<T, StaticAllocHandle<T>> for TreeModel<T, C, StaticAllocHandle<T>>
+where
+    T: Translate + Scale + Rotate,
+    C: Translate + Scale + Rotate,
 {
     fn make_alive(&mut self, handle: std::sync::Arc<StaticAllocHandle<T>>) {
         match self {
@@ -152,8 +154,10 @@ impl<C: Translate + Scale + Rotate, T: Translate + Scale + Rotate> Model<T, Stat
     }
 }
 
-impl<C: Translate + Scale + Rotate, T: Translate + Scale + Rotate> Model<T, DynamicAllocHandle<T>>
-    for TreeModel<T, C, DynamicAllocHandle<T>>
+impl<T, C> Model<T, DynamicAllocHandle<T>> for TreeModel<T, C, DynamicAllocHandle<T>>
+where
+    T: Translate + Scale + Rotate,
+    C: Translate + Scale + Rotate,
 {
     fn make_alive(&mut self, handle: std::sync::Arc<DynamicAllocHandle<T>>) {
         match self {
@@ -201,11 +205,11 @@ impl<C: Translate + Scale + Rotate, T: Translate + Scale + Rotate> Model<T, Dyna
     }
 }
 
-impl<
-        T: Translate + Scale + Rotate,
-        C: Translate + Scale + Rotate + Hitbox + Interactive,
-        H: AllocHandle<T>,
-    > HitboxNode<TreeModel<T, C, H>> for TreeModel<T, C, H>
+impl<T, C, H> HitboxNode<TreeModel<T, C, H>> for TreeModel<T, C, H>
+where
+    T: Translate + Scale + Rotate,
+    C: Translate + Scale + Rotate + Hitbox,
+    H: AllocHandle<T>,
 {
     fn hitbox(&self) -> &dyn crate::picking::Hitbox {
         match self {
@@ -222,11 +226,11 @@ impl<
     }
 }
 
-impl<
-        T: Translate + Scale + Rotate,
-        C: Translate + Scale + Rotate + Interactive,
-        H: AllocHandle<T>,
-    > Interactive for TreeModel<T, C, H>
+impl<T, C, H> Interactive for TreeModel<T, C, H>
+where
+    T: Translate + Scale + Rotate,
+    C: Translate + Scale + Rotate + Interactive,
+    H: AllocHandle<T>,
 {
     fn mouse_clicked(&mut self, button: winit::event::MouseButton) {
         match self {
