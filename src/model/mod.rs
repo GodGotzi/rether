@@ -3,7 +3,7 @@ use std::sync::Arc;
 use geometry::IndexedGeometry;
 use transform::{Rotate, Scale, Translate};
 
-use crate::{alloc::AllocHandle, SimpleGeometry};
+use crate::{alloc::AllocHandle, picking::Hitbox, SimpleGeometry};
 
 mod base;
 pub mod geometry;

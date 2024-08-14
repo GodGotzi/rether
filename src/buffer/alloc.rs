@@ -168,6 +168,13 @@ pub trait BufferDynamicAlloc<T>: BufferAlloc<T, Handle = DynamicAllocHandle<T>> 
     fn get_destroyed_handles(&self) -> Vec<BufferAllocationID>;
 }
 
+pub struct BufferStaticAllocator<T> {
+    action_queue: std::sync::mpsc::Receiver<ModifyAction<T>>,
+    dummy_action_sender: std::sync::mpsc::Sender<ModifyAction<T>>,
+
+    size: usize,
+}
+
 #[derive(Debug)]
 pub struct BufferDynamicAllocator<T> {
     packets: HashMap<BufferAllocationID, Arc<DynamicAllocHandle<T>>>,
@@ -178,7 +185,7 @@ pub struct BufferDynamicAllocator<T> {
     action_queue: std::sync::mpsc::Receiver<ModifyAction<T>>,
     dummy_action_sender: std::sync::mpsc::Sender<ModifyAction<T>>,
 
-    pub size: usize,
+    size: usize,
 }
 
 impl<T> Default for BufferDynamicAllocator<T> {

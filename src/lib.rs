@@ -62,13 +62,13 @@ fn test() {
 
     let mut allocater = alloc::BufferDynamicAllocator::<Vertex>::default();
 
-    println!("{:?}", allocater.size);
+    println!("{:?}", allocater.size());
 
     let handle = alloc::BufferDynamicAlloc::allocate(&mut allocater, "test", 100000);
 
     model.make_alive(handle);
 
-    println!("{:?}", allocater.size);
+    println!("{:?}", allocater.size());
 
     //println!("{:?}", gpu_buffer.borrow());
 
@@ -93,13 +93,13 @@ fn test() {
 
     model.destroy();
 
-    println!("{:?}", allocater.size);
+    println!("{:?}", allocater.size());
 
     for id in allocater.get_destroyed_handles() {
         allocater.free(&id);
     }
 
-    println!("{:?}", allocater.size);
+    println!("{:?}", allocater.size());
 
     panic!("asdas")
 }
