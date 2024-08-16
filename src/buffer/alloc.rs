@@ -43,6 +43,7 @@ pub trait AllocHandle<T> {
     }
 }
 
+#[derive(Debug)]
 pub struct StaticAllocHandle<T> {
     id: String,
     pub offset: usize,
