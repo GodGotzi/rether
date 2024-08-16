@@ -66,6 +66,19 @@ impl<T> StaticAllocHandle<T> {
             action_sender,
         }
     }
+
+    pub fn from_buffer_allocation(
+        id: &str,
+        allocation: BufferAllocation,
+        action_sender: Sender<ModifyAction<T>>,
+    ) -> Self {
+        Self {
+            id: id.to_string(),
+            offset: allocation.offset,
+            size: allocation.size,
+            action_sender,
+        }
+    }
 }
 
 impl<T> std::hash::Hash for StaticAllocHandle<T> {
