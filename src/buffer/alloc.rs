@@ -69,7 +69,7 @@ impl<T> StaticAllocHandle<T> {
 
     pub fn from_buffer_allocation(
         id: &str,
-        allocation: BufferAllocation,
+        allocation: &BufferAllocation,
         action_sender: Sender<ModifyAction<T>>,
     ) -> Self {
         Self {
