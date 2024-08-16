@@ -52,6 +52,22 @@ pub struct StaticAllocHandle<T> {
     action_sender: Sender<ModifyAction<T>>,
 }
 
+impl<T> StaticAllocHandle<T> {
+    pub fn new(
+        id: &str,
+        offset: usize,
+        size: usize,
+        action_sender: Sender<ModifyAction<T>>,
+    ) -> Self {
+        Self {
+            id: id.to_string(),
+            offset,
+            size,
+            action_sender,
+        }
+    }
+}
+
 impl<T> std::hash::Hash for StaticAllocHandle<T> {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.id.hash(state);
