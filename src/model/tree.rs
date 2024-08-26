@@ -26,7 +26,7 @@ pub enum TreeModel<T, C, H: AllocHandle<T>> {
 impl<T, C, H> TreeModel<T, C, H>
 where
     T: Translate + Scale + Rotate + Clone,
-    C: Translate + Scale + Rotate + Expandable,
+    C: Translate + Scale + Rotate + Hitbox,
     H: AllocHandle<T>,
 {
     pub fn consume_expand(&mut self, other: Self) {
