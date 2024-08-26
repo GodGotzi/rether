@@ -58,8 +58,8 @@ pub trait IndexedModel<T: Translate + Rotate + Scale, H: AllocHandle<T>>:
     fn is_destroyed(&self) -> bool {
         false
     }
-    fn raw_handle(&self) -> Arc<H>;
-    fn raw_index_handle(&self) -> Arc<H>;
+
+    fn state(&self) -> &ModelState<T, H>;
 }
 
 pub trait Expandable {
