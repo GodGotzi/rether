@@ -29,7 +29,7 @@ where
     C: Translate + Scale + Rotate + Hitbox,
     H: AllocHandle<T>,
 {
-    pub fn consume_expand(&mut self, other: Self) {
+    pub fn add_child(&mut self, other: Self) {
         match self {
             TreeModel::Root {
                 state: self_state,
