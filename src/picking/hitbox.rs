@@ -15,7 +15,7 @@ pub trait Hitbox: std::fmt::Debug + Send + Sync {
 }
 
 pub trait HitboxNode<M: HitboxNode<M>> {
-    fn hitbox(&self) -> &dyn Hitbox;
+    fn check_hit(&self, ray: &Ray) -> Option<f32>;
     fn inner_nodes(&self) -> &[M];
 }
 
@@ -40,7 +40,7 @@ impl<M: HitboxNode<M>> HitboxRoot<M> {
         let mut queue = HitboxQueue::new(); // Creating a new HitboxQueue
 
         for hitbox in self.inner_hitboxes.iter() {
-            let distance = hitbox.hitbox().check_hit(ray);
+            let distance = hitbox.check_hit(ray);
             if let Some(distance) = distance {
                 queue.push(HitBoxQueueEntry { hitbox, distance });
             }
@@ -51,7 +51,7 @@ impl<M: HitboxNode<M>> HitboxRoot<M> {
                 return Some(hitbox);
             } else {
                 for inner_hitbox in hitbox.inner_nodes() {
-                    let distance = inner_hitbox.hitbox().check_hit(ray);
+                    let distance = inner_hitbox.check_hit(ray);
                     if let Some(distance) = distance {
                         queue.push(HitBoxQueueEntry {
                             hitbox: inner_hitbox,

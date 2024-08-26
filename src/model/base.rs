@@ -39,11 +39,11 @@ where
 impl<T, C, H> HitboxNode<BaseModel<T, C, H>> for BaseModel<T, C, H>
 where
     T: Translate + Scale + Rotate,
-    C: Translate + Scale + Rotate + Hitbox + Interactive,
+    C: Translate + Scale + Rotate + Hitbox,
     H: AllocHandle<T>,
 {
-    fn hitbox(&self) -> &dyn crate::picking::Hitbox {
-        &self.ctx
+    fn check_hit(&self, ray: &crate::picking::Ray) -> Option<f32> {
+        self.ctx.check_hit(ray)
     }
 
     fn inner_nodes(&self) -> &[BaseModel<T, C, H>] {

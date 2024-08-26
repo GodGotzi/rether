@@ -211,10 +211,9 @@ where
     C: Translate + Scale + Rotate + Hitbox,
     H: AllocHandle<T>,
 {
-    fn hitbox(&self) -> &dyn crate::picking::Hitbox {
+    fn check_hit(&self, ray: &crate::picking::Ray) -> Option<f32> {
         match self {
-            Self::Root { ctx, .. } => ctx,
-            Self::Node { ctx, .. } => ctx,
+            Self::Root { ctx, .. } | Self::Node { ctx, .. } => ctx.check_hit(ray),
         }
     }
 
