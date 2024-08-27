@@ -1,5 +1,7 @@
 use core::panic;
 
+use parking_lot::RwLock;
+
 use crate::{
     alloc::{AllocHandle, DynamicAllocHandle, ModifyAction, StaticAllocHandle},
     picking::{interact::Interactive, Hitbox, HitboxNode},
@@ -9,12 +11,12 @@ use crate::{
 use super::{
     geometry::IndexedGeometry,
     transform::{Rotate, Scale, Translate},
-    Model, ModelState,
+    InteractiveModel, Model, ModelState, RotateModel, ScaleModel, TranslateModel,
 };
 
 pub struct BaseModel<T, C, H: AllocHandle<T>> {
-    state: ModelState<T, H>,
-    ctx: C,
+    state: RwLock<ModelState<T, H>>,
+    ctx: RwLock<C>,
 }
 
 impl<T, C, H> BaseModel<T, C, H>
@@ -23,15 +25,15 @@ where
 {
     pub fn simple(ctx: C, geometry: SimpleGeometry<T>) -> Self {
         Self {
-            state: ModelState::Dormant(geometry),
-            ctx,
+            state: RwLock::new(ModelState::Dormant(geometry)),
+            ctx: RwLock::new(ctx),
         }
     }
 
     pub fn indexed(ctx: C, geometry: IndexedGeometry<T>) -> Self {
         Self {
-            state: ModelState::DormantIndexed(geometry),
-            ctx,
+            state: RwLock::new(ModelState::DormantIndexed(geometry)),
+            ctx: RwLock::new(ctx),
         }
     }
 }
@@ -43,7 +45,7 @@ where
     H: AllocHandle<T>,
 {
     fn check_hit(&self, ray: &crate::picking::Ray) -> Option<f32> {
-        self.ctx.check_hit(ray)
+        self.ctx.read().check_hit(ray)
     }
 
     fn inner_nodes(&self) -> &[BaseModel<T, C, H>] {
@@ -51,22 +53,21 @@ where
     }
 }
 
-impl<T, C, H> Interactive for BaseModel<T, C, H>
+impl<T, C, H> InteractiveModel for BaseModel<T, C, H>
 where
-    T: Translate + Scale + Rotate,
-    C: Translate + Scale + Rotate + Interactive,
+    C: Interactive,
     H: AllocHandle<T>,
 {
-    fn mouse_clicked(&mut self, button: winit::event::MouseButton) {
-        self.ctx.mouse_clicked(button);
+    fn mouse_clicked(&self, button: winit::event::MouseButton) {
+        self.ctx.write().mouse_clicked(button);
     }
 
-    fn mouse_motion(&mut self, button: winit::event::MouseButton, delta: glam::Vec2) {
-        self.ctx.mouse_motion(button, delta);
+    fn mouse_motion(&self, button: winit::event::MouseButton, delta: glam::Vec2) {
+        self.ctx.write().mouse_motion(button, delta);
     }
 
-    fn mouse_scroll(&mut self, delta: f32) {
-        self.ctx.mouse_scroll(delta);
+    fn mouse_scroll(&self, delta: f32) {
+        self.ctx.write().mouse_scroll(delta);
     }
 }
 
@@ -75,15 +76,15 @@ where
     T: Translate + Scale + Rotate,
     C: Translate + Scale + Rotate,
 {
-    fn wake(&mut self, handle: std::sync::Arc<StaticAllocHandle<T>>) {
-        self.state = ModelState::Awake(handle);
+    fn wake(&self, handle: std::sync::Arc<StaticAllocHandle<T>>) {
+        *self.state.write() = ModelState::Awake(handle);
     }
 
-    fn state(&self) -> &ModelState<T, StaticAllocHandle<T>> {
+    fn state(&self) -> &RwLock<ModelState<T, StaticAllocHandle<T>>> {
         &self.state
     }
 
-    fn destroy(&mut self) {
+    fn destroy(&self) {
         panic!("Static handle cannot be destroyed");
     }
 }
@@ -93,76 +94,111 @@ where
     T: Translate + Scale + Rotate,
     C: Translate + Scale + Rotate,
 {
-    fn wake(&mut self, handle: std::sync::Arc<DynamicAllocHandle<T>>) {
-        self.state = ModelState::Awake(handle);
+    fn wake(&self, handle: std::sync::Arc<DynamicAllocHandle<T>>) {
+        *self.state.write() = ModelState::Awake(handle);
     }
 
-    fn state(&self) -> &ModelState<T, DynamicAllocHandle<T>> {
+    fn state(&self) -> &RwLock<ModelState<T, DynamicAllocHandle<T>>> {
         &self.state
     }
 
-    fn destroy(&mut self) {
-        match self.state {
+    fn destroy(&self) {
+        match &*self.state.read() {
             ModelState::Awake(ref handle) => {
                 handle.destroy();
             }
             _ => panic!("Cannot destroy a dead handle"),
         };
 
-        self.state = ModelState::Destroyed;
+        *self.state.write() = ModelState::Destroyed;
     }
 
     fn is_destroyed(&self) -> bool {
-        self.state.is_destroyed()
+        self.state.read().is_destroyed()
     }
 }
 
 // Translate, Rotate and Scale are implemented for BaseModel
-impl<T, C, H> Translate for BaseModel<T, C, H>
+impl<T, C, H> TranslateModel for BaseModel<T, C, H>
 where
-    T: Translate + Scale + Rotate,
-    C: Translate + Scale + Rotate,
+    T: Translate,
+    C: Translate,
     H: AllocHandle<T>,
 {
-    fn translate(&mut self, translation: glam::Vec3) {
-        match self.state {
+    fn translate(&self, translation: glam::Vec3) {
+        match &mut *self.state.write() {
             ModelState::Awake(ref mut handle) => {
                 let mod_action = Box::new(move |data: &mut [T]| data.translate(translation));
 
                 let action = ModifyAction::new(0, handle.size(), mod_action);
 
                 handle.send_action(action).expect("Failed to send action");
-
-                self.ctx.translate(translation);
             }
             ModelState::Dormant(ref mut geometry) => {
                 geometry.translate(translation);
-
-                self.ctx.translate(translation);
+            }
+            ModelState::DormantIndexed(ref mut geometry) => {
+                geometry.translate(translation);
             }
             _ => panic!("Cannot translate a dead handle"),
         }
+
+        self.ctx.write().translate(translation);
     }
 }
 
-impl<T, C, H> Rotate for BaseModel<T, C, H>
+impl<T, C, H> RotateModel for BaseModel<T, C, H>
 where
-    T: Translate + Scale + Rotate,
-    C: Translate + Scale + Rotate,
+    T: Rotate,
+    C: Rotate,
     H: AllocHandle<T>,
 {
-    fn rotate(&mut self, rotation: glam::Quat) {
-        self.ctx.rotate(rotation);
+    fn rotate(&self, rotation: glam::Quat) {
+        match &mut *self.state.write() {
+            ModelState::Awake(ref mut handle) => {
+                let mod_action = Box::new(move |data: &mut [T]| data.rotate(rotation));
+
+                let action = ModifyAction::new(0, handle.size(), mod_action);
+
+                handle.send_action(action).expect("Failed to send action");
+            }
+            ModelState::Dormant(ref mut geometry) => {
+                geometry.rotate(rotation);
+            }
+            ModelState::DormantIndexed(ref mut geometry) => {
+                geometry.rotate(rotation);
+            }
+            _ => panic!("Cannot rotate a dead handle"),
+        }
+
+        self.ctx.write().rotate(rotation);
     }
 }
 
-impl<T, C, H> Scale for BaseModel<T, C, H>
+impl<T, C, H> ScaleModel for BaseModel<T, C, H>
 where
-    T: Translate + Scale + Rotate,
-    C: Translate + Scale + Rotate,
+    T: Scale,
+    C: Scale,
     H: AllocHandle<T>,
 {
-    fn scale(&mut self, scale: glam::Vec3) {
-        self.ctx.scale(scale);
+    fn scale(&self, scale: glam::Vec3) {
+        match &mut *self.state.write() {
+            ModelState::Awake(ref mut handle) => {
+                let mod_action = Box::new(move |data: &mut [T]| data.scale(scale));
+
+                let action = ModifyAction::new(0, handle.size(), mod_action);
+
+                handle.send_action(action).expect("Failed to send action");
+            }
+            ModelState::Dormant(ref mut geometry) => {
+                geometry.scale(scale);
+            }
+            ModelState::DormantIndexed(ref mut geometry) => {
+                geometry.scale(scale);
+            }
+            _ => panic!("Cannot scale a dead handle"),
+        }
+
+        self.ctx.write().scale(scale);
     }
 }

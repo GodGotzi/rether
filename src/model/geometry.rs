@@ -29,7 +29,7 @@ impl<T: Scale> Scale for [T] {
     }
 }
 
-pub trait Geometry: Translate + Rotate + Scale + Expandable {
+pub trait Geometry: Expandable {
     type Data<'a>
     where
         Self: 'a;
@@ -57,7 +57,7 @@ impl<T> SimpleGeometry<T> {
 
 impl<T> Geometry for SimpleGeometry<T>
 where
-    T: Translate + Rotate + Scale + Clone,
+    T: Clone,
 {
     type Data<'a> = BufferData<'a, T> where T: 'a;
 
@@ -119,7 +119,7 @@ impl<T: Clone> IndexedGeometry<T> {
 
 impl<T> Geometry for IndexedGeometry<T>
 where
-    T: Translate + Rotate + Scale + Clone,
+    T: Clone,
 {
     type Data<'a> = IndexedBufferData<'a, T> where T: 'a;
 

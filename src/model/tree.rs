@@ -1,32 +1,37 @@
 use core::panic;
 
+use parking_lot::RwLock;
+
 use crate::{
     alloc::{AllocHandle, DynamicAllocHandle, ModifyAction, StaticAllocHandle},
     model::{BufferLocation, Model, ModelState},
     picking::{interact::Interactive, Hitbox, HitboxNode},
-    Rotate, Scale, Translate,
+    Rotate, Scale, Transform, Translate,
 };
 
-use super::{geometry::Geometry, Expandable};
+use super::{
+    geometry::Geometry, Expandable, InteractiveModel, RotateModel, ScaleModel, TranslateModel,
+};
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub enum TreeModel<T, C, H: AllocHandle<T>> {
     Root {
-        state: ModelState<T, H>,
+        state: RwLock<ModelState<T, H>>,
+        transform: RwLock<Transform>,
         sub_handles: Vec<TreeModel<T, C, H>>,
-        ctx: C,
+        ctx: RwLock<C>,
     },
     Node {
         location: BufferLocation,
         sub_handles: Vec<TreeModel<T, C, H>>,
-        ctx: C,
+        ctx: RwLock<C>,
     },
 }
 
 impl<T, C, H> TreeModel<T, C, H>
 where
-    T: Translate + Scale + Rotate + Clone,
-    C: Translate + Scale + Rotate + Hitbox,
+    T: Clone,
+    C: Hitbox,
     H: AllocHandle<T>,
 {
     pub fn add_child(&mut self, other: Self) {
@@ -35,18 +40,20 @@ where
                 state: self_state,
                 sub_handles: self_sub_handles,
                 ctx: self_ctx,
+                ..
             } => match other {
                 TreeModel::Root {
-                    state,
+                    mut state,
                     sub_handles,
-                    ctx,
+                    mut ctx,
+                    ..
                 } => {
-                    let (offset, size) = match self_state {
-                        ModelState::Dormant(geometry) => match state {
+                    let (offset, size) = match self_state.get_mut() {
+                        ModelState::Dormant(geometry) => match state.get_mut() {
                             ModelState::Dormant(other_geometry) => {
                                 let offset = geometry.data_len();
 
-                                geometry.expand(&other_geometry);
+                                geometry.expand(other_geometry);
 
                                 (offset, other_geometry.data_len())
                             }
@@ -55,14 +62,14 @@ where
                             }
                             _ => panic!("Cannot expand an alive or dead handle"),
                         },
-                        ModelState::DormantIndexed(geometry) => match state {
+                        ModelState::DormantIndexed(geometry) => match state.get_mut() {
                             ModelState::Dormant(_) => {
                                 panic!("Cannot expand a dormant geometry with an indexed geometry");
                             }
                             ModelState::DormantIndexed(other_geometry) => {
                                 let offset = geometry.data_len();
 
-                                geometry.expand(&other_geometry);
+                                geometry.expand(other_geometry);
 
                                 (offset, other_geometry.data_len())
                             }
@@ -71,7 +78,7 @@ where
                         _ => panic!("Cannot expand an alive or dead handle"),
                     };
 
-                    self_ctx.expand(&ctx);
+                    self_ctx.get_mut().expand(ctx.get_mut());
 
                     let node = TreeModel::Node {
                         location: BufferLocation { offset, size },
@@ -84,9 +91,9 @@ where
                 TreeModel::Node {
                     location,
                     sub_handles,
-                    ctx,
+                    mut ctx,
                 } => {
-                    self_ctx.expand(&ctx);
+                    self_ctx.get_mut().expand(ctx.get_mut());
 
                     let node = TreeModel::Node {
                         location,
@@ -105,9 +112,9 @@ where
                 TreeModel::Node {
                     location: mut other_location,
                     sub_handles,
-                    ctx,
+                    mut ctx,
                 } => {
-                    self_ctx.expand(&ctx);
+                    self_ctx.get_mut().expand(ctx.get_mut());
 
                     other_location.offset += location.size;
                     location.size += other_location.size;
@@ -126,15 +133,11 @@ where
     }
 }
 
-impl<T, C> Model<T, StaticAllocHandle<T>> for TreeModel<T, C, StaticAllocHandle<T>>
-where
-    T: Translate + Scale + Rotate,
-    C: Translate + Scale + Rotate,
-{
-    fn wake(&mut self, handle: std::sync::Arc<StaticAllocHandle<T>>) {
+impl<T, C> Model<T, StaticAllocHandle<T>> for TreeModel<T, C, StaticAllocHandle<T>> {
+    fn wake(&self, handle: std::sync::Arc<StaticAllocHandle<T>>) {
         match self {
             Self::Root { state, .. } => {
-                *state = ModelState::Awake(handle);
+                *state.write() = ModelState::Awake(handle);
             }
             Self::Node { .. } => {
                 panic!("Cannot make alive a node");
@@ -142,14 +145,14 @@ where
         }
     }
 
-    fn state(&self) -> &ModelState<T, StaticAllocHandle<T>> {
+    fn state(&self) -> &RwLock<ModelState<T, StaticAllocHandle<T>>> {
         match self {
             Self::Root { state, .. } => state,
             Self::Node { .. } => panic!("Cannot get state from node"),
         }
     }
 
-    fn destroy(&mut self) {
+    fn destroy(&self) {
         panic!("Static handle cannot be destroyed");
     }
 }
@@ -159,10 +162,10 @@ where
     T: Translate + Scale + Rotate,
     C: Translate + Scale + Rotate,
 {
-    fn wake(&mut self, handle: std::sync::Arc<DynamicAllocHandle<T>>) {
+    fn wake(&self, handle: std::sync::Arc<DynamicAllocHandle<T>>) {
         match self {
             Self::Root { state, .. } => {
-                *state = ModelState::Awake(handle);
+                *state.write() = ModelState::Awake(handle);
             }
             Self::Node { .. } => {
                 panic!("Cannot make alive a node");
@@ -170,24 +173,24 @@ where
         }
     }
 
-    fn state(&self) -> &crate::model::ModelState<T, DynamicAllocHandle<T>> {
+    fn state(&self) -> &RwLock<ModelState<T, DynamicAllocHandle<T>>> {
         match self {
             Self::Root { state, .. } => state,
             Self::Node { .. } => panic!("Cannot get state from node"),
         }
     }
 
-    fn destroy(&mut self) {
+    fn destroy(&self) {
         match self {
             Self::Root { state, .. } => {
-                match state {
+                match &*state.read() {
                     ModelState::Awake(handle) => {
                         handle.destroy();
                     }
                     _ => panic!("Cannot destroy a dead handle"),
                 }
 
-                *state = ModelState::Destroyed;
+                *state.write() = ModelState::Destroyed;
             }
             Self::Node { .. } => {
                 panic!("Cannot destroy a node");
@@ -197,7 +200,7 @@ where
 
     fn is_destroyed(&self) -> bool {
         match self {
-            Self::Root { state, .. } => state.is_destroyed(),
+            Self::Root { state, .. } => state.read().is_destroyed(),
             Self::Node { .. } => {
                 panic!("Cannot check if a node is destroyed");
             }
@@ -213,7 +216,7 @@ where
 {
     fn check_hit(&self, ray: &crate::picking::Ray) -> Option<f32> {
         match self {
-            Self::Root { ctx, .. } | Self::Node { ctx, .. } => ctx.check_hit(ray),
+            Self::Root { ctx, .. } | Self::Node { ctx, .. } => ctx.read().check_hit(ray),
         }
     }
 
@@ -225,85 +228,89 @@ where
     }
 }
 
-impl<T, C, H> Interactive for TreeModel<T, C, H>
+impl<T, C, H> InteractiveModel for TreeModel<T, C, H>
 where
-    T: Translate + Scale + Rotate,
-    C: Translate + Scale + Rotate + Interactive,
+    C: Interactive,
     H: AllocHandle<T>,
 {
-    fn mouse_clicked(&mut self, button: winit::event::MouseButton) {
+    fn mouse_clicked(&self, button: winit::event::MouseButton) {
         match self {
             Self::Root { ctx, .. } | Self::Node { ctx, .. } => {
-                ctx.mouse_clicked(button);
+                ctx.write().mouse_clicked(button);
             }
         }
     }
 
-    fn mouse_motion(&mut self, button: winit::event::MouseButton, delta: glam::Vec2) {
+    fn mouse_motion(&self, button: winit::event::MouseButton, delta: glam::Vec2) {
         match self {
             Self::Root { ctx, .. } | Self::Node { ctx, .. } => {
-                ctx.mouse_motion(button, delta);
+                ctx.write().mouse_motion(button, delta);
             }
         }
     }
 
-    fn mouse_scroll(&mut self, delta: f32) {
+    fn mouse_scroll(&self, delta: f32) {
         match self {
             Self::Root { ctx, .. } | Self::Node { ctx, .. } => {
-                ctx.mouse_scroll(delta);
+                ctx.write().mouse_scroll(delta);
             }
         }
     }
 }
 
-impl<T: Translate, C: Translate, H: AllocHandle<T>> Translate for TreeModel<T, C, H> {
-    fn translate(&mut self, translation: glam::Vec3) {
+impl<T: Translate, C: Translate, H: AllocHandle<T>> TranslateModel for TreeModel<T, C, H> {
+    fn translate(&self, translation: glam::Vec3) {
         match self {
             Self::Root {
                 state,
                 sub_handles,
                 ctx,
+                transform,
                 ..
-            } => match state {
-                ModelState::Awake(handle) => {
-                    let mod_action = Box::new(move |data: &mut [T]| data.translate(translation));
+            } => {
+                transform.write().translate(translation);
+                match &mut *state.write() {
+                    ModelState::Awake(handle) => {
+                        let mod_action =
+                            Box::new(move |data: &mut [T]| data.translate(translation));
 
-                    let action = ModifyAction::new(0, handle.size(), mod_action);
+                        let action = ModifyAction::new(0, handle.size(), mod_action);
 
-                    handle.send_action(action).expect("Failed to send action");
+                        handle.send_action(action).expect("Failed to send action");
 
-                    ctx.translate(translation);
+                        ctx.write().translate(translation);
 
-                    for handle in sub_handles.iter_mut() {
-                        handle.translate(translation);
+                        for handle in sub_handles.iter() {
+                            handle.translate(translation);
+                        }
                     }
-                }
-                ModelState::Dormant(geometry) => {
-                    geometry.translate(translation);
+                    ModelState::Dormant(geometry) => {
+                        geometry.translate(translation);
 
-                    ctx.translate(translation);
+                        ctx.write().translate(translation);
 
-                    for handle in sub_handles.iter_mut() {
-                        handle.translate(translation);
+                        for handle in sub_handles.iter() {
+                            handle.translate(translation);
+                        }
                     }
-                }
-                ModelState::DormantIndexed(geometry) => {
-                    geometry.translate(translation);
+                    ModelState::DormantIndexed(geometry) => {
+                        geometry.translate(translation);
 
-                    ctx.translate(translation);
+                        ctx.write().translate(translation);
 
-                    for handle in sub_handles.iter_mut() {
-                        handle.translate(translation);
+                        for handle in sub_handles.iter() {
+                            handle.translate(translation);
+                        }
                     }
+                    _ => panic!("Cannot translate a dead handle"),
                 }
-                _ => panic!("Cannot translate a dead handle"),
-            },
+            }
             Self::Node {
                 ctx, sub_handles, ..
             } => {
-                ctx.translate(translation);
+                ctx.write().translate(translation);
 
-                for handle in sub_handles.iter_mut() {
+                for handle in sub_handles.iter() {
                     handle.translate(translation);
                 }
             }
@@ -311,27 +318,58 @@ impl<T: Translate, C: Translate, H: AllocHandle<T>> Translate for TreeModel<T, C
     }
 }
 
-impl<T: Rotate, C: Rotate, H: AllocHandle<T>> Rotate for TreeModel<T, C, H> {
-    fn rotate(&mut self, rotation: glam::Quat) {
+impl<T: Rotate, C: Rotate, H: AllocHandle<T>> RotateModel for TreeModel<T, C, H> {
+    fn rotate(&self, rotation: glam::Quat) {
         match self {
             Self::Root {
-                // transform,
+                state,
                 sub_handles,
                 ctx,
+                transform,
                 ..
             } => {
-                // transform.rotate(rotation);
-                ctx.rotate(rotation);
-                for handle in sub_handles.iter_mut() {
-                    handle.rotate(rotation);
+                transform.write().rotate(rotation);
+                match &mut *state.write() {
+                    ModelState::Awake(handle) => {
+                        let mod_action = Box::new(move |data: &mut [T]| data.rotate(rotation));
+
+                        let action = ModifyAction::new(0, handle.size(), mod_action);
+
+                        handle.send_action(action).expect("Failed to send action");
+
+                        ctx.write().rotate(rotation);
+
+                        for handle in sub_handles.iter() {
+                            handle.rotate(rotation);
+                        }
+                    }
+                    ModelState::Dormant(geometry) => {
+                        geometry.rotate(rotation);
+
+                        ctx.write().rotate(rotation);
+
+                        for handle in sub_handles.iter() {
+                            handle.rotate(rotation);
+                        }
+                    }
+                    ModelState::DormantIndexed(geometry) => {
+                        geometry.rotate(rotation);
+
+                        ctx.write().rotate(rotation);
+
+                        for handle in sub_handles.iter() {
+                            handle.rotate(rotation);
+                        }
+                    }
+                    _ => panic!("Cannot rotate a dead handle"),
                 }
             }
             Self::Node {
                 ctx, sub_handles, ..
             } => {
-                ctx.rotate(rotation);
+                ctx.write().rotate(rotation);
 
-                for handle in sub_handles.iter_mut() {
+                for handle in sub_handles.iter() {
                     handle.rotate(rotation);
                 }
             }
@@ -339,27 +377,58 @@ impl<T: Rotate, C: Rotate, H: AllocHandle<T>> Rotate for TreeModel<T, C, H> {
     }
 }
 
-impl<T: Scale, C: Scale, H: AllocHandle<T>> Scale for TreeModel<T, C, H> {
-    fn scale(&mut self, scale: glam::Vec3) {
+impl<T: Scale, C: Scale, H: AllocHandle<T>> ScaleModel for TreeModel<T, C, H> {
+    fn scale(&self, scale: glam::Vec3) {
         match self {
             Self::Root {
-                // transform,
+                state,
                 sub_handles,
                 ctx,
+                transform,
                 ..
             } => {
-                // transform.scale(scale);
-                ctx.scale(scale);
-                for handle in sub_handles.iter_mut() {
-                    handle.scale(scale);
+                transform.write().scale(scale);
+                match &mut *state.write() {
+                    ModelState::Awake(handle) => {
+                        let mod_action = Box::new(move |data: &mut [T]| data.scale(scale));
+
+                        let action = ModifyAction::new(0, handle.size(), mod_action);
+
+                        handle.send_action(action).expect("Failed to send action");
+
+                        ctx.write().scale(scale);
+
+                        for handle in sub_handles.iter() {
+                            handle.scale(scale);
+                        }
+                    }
+                    ModelState::Dormant(geometry) => {
+                        geometry.scale(scale);
+
+                        ctx.write().scale(scale);
+
+                        for handle in sub_handles.iter() {
+                            handle.scale(scale);
+                        }
+                    }
+                    ModelState::DormantIndexed(geometry) => {
+                        geometry.scale(scale);
+
+                        ctx.write().scale(scale);
+
+                        for handle in sub_handles.iter() {
+                            handle.scale(scale);
+                        }
+                    }
+                    _ => panic!("Cannot scale a dead handle"),
                 }
             }
             Self::Node {
                 ctx, sub_handles, ..
             } => {
-                ctx.scale(scale);
+                ctx.write().scale(scale);
 
-                for handle in sub_handles.iter_mut() {
+                for handle in sub_handles.iter() {
                     handle.scale(scale);
                 }
             }

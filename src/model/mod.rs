@@ -1,7 +1,9 @@
 use std::sync::Arc;
 
 use geometry::IndexedGeometry;
-use transform::{Rotate, Scale, Translate};
+use glam::Vec2;
+use parking_lot::RwLock;
+use winit::event::MouseButton;
 
 use crate::{alloc::AllocHandle, SimpleGeometry};
 
@@ -37,29 +39,43 @@ impl<T, H> ModelState<T, H> {
     }
 }
 
-pub trait Model<T: Translate + Rotate + Scale, H: AllocHandle<T>>:
-    Translate + Rotate + Scale
-{
-    fn wake(&mut self, handle: Arc<H>);
+pub trait TranslateModel {
+    fn translate(&self, translation: glam::Vec3);
+}
 
-    fn destroy(&mut self) {}
+pub trait RotateModel {
+    fn rotate(&self, rotation: glam::Quat);
+}
+
+pub trait ScaleModel {
+    fn scale(&self, scale: glam::Vec3);
+}
+
+pub trait InteractiveModel {
+    fn mouse_clicked(&self, button: MouseButton);
+    fn mouse_scroll(&self, delta: f32);
+    fn mouse_motion(&self, button: MouseButton, delta: Vec2);
+}
+
+pub trait Model<T, H: AllocHandle<T>> {
+    fn wake(&self, handle: Arc<H>);
+
+    fn destroy(&self) {}
     fn is_destroyed(&self) -> bool {
         false
     }
 
-    fn state(&self) -> &ModelState<T, H>;
+    fn state(&self) -> &RwLock<ModelState<T, H>>;
 }
 
-pub trait IndexedModel<T: Translate + Rotate + Scale, H: AllocHandle<T>>:
-    Translate + Rotate + Scale
-{
+pub trait IndexedModel<T, H: AllocHandle<T>> {
     fn wake(&self, handle: Arc<H>, index_handle: Arc<H>);
     fn destroy(&self) {}
     fn is_destroyed(&self) -> bool {
         false
     }
 
-    fn state(&self) -> &ModelState<T, H>;
+    fn state(&self) -> &RwLock<ModelState<T, H>>;
 }
 
 pub trait Expandable {
