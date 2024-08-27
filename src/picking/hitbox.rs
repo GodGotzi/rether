@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use glam::Vec3;
 
 use super::{
@@ -25,7 +27,7 @@ pub trait HitboxNode<M: HitboxNode<M>> {
 // Definition of the HitboxNode enum with Debug trait
 #[derive(Debug, Clone)]
 pub struct HitboxRoot<M: HitboxNode<M>> {
-    inner_hitboxes: Vec<M>,
+    inner_hitboxes: Vec<Arc<M>>,
 }
 
 // Implementation of methods for HitboxNode
@@ -37,7 +39,7 @@ impl<M: HitboxNode<M>> HitboxRoot<M> {
     }
 
     pub fn check_hit(&self, ray: &Ray) -> Option<&M> {
-        let mut queue = HitboxQueue::new(); // Creating a new HitboxQueue
+        let mut queue = HitboxQueue::<M>::new(); // Creating a new HitboxQueue
 
         for hitbox in self.inner_hitboxes.iter() {
             let distance = hitbox.check_hit(ray);
@@ -65,7 +67,7 @@ impl<M: HitboxNode<M>> HitboxRoot<M> {
         None
     }
 
-    pub fn add_node(&mut self, node: M) {
+    pub fn add_node(&mut self, node: Arc<M>) {
         self.inner_hitboxes.push(node);
     }
 }
