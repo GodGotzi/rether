@@ -75,8 +75,8 @@ where
     T: Translate + Scale + Rotate,
     C: Translate + Scale + Rotate,
 {
-    fn make_alive(&mut self, handle: std::sync::Arc<StaticAllocHandle<T>>) {
-        self.state = ModelState::Alive(handle);
+    fn wake(&mut self, handle: std::sync::Arc<StaticAllocHandle<T>>) {
+        self.state = ModelState::Awake(handle);
     }
 
     fn state(&self) -> &ModelState<T, StaticAllocHandle<T>> {
@@ -93,8 +93,8 @@ where
     T: Translate + Scale + Rotate,
     C: Translate + Scale + Rotate,
 {
-    fn make_alive(&mut self, handle: std::sync::Arc<DynamicAllocHandle<T>>) {
-        self.state = ModelState::Alive(handle);
+    fn wake(&mut self, handle: std::sync::Arc<DynamicAllocHandle<T>>) {
+        self.state = ModelState::Awake(handle);
     }
 
     fn state(&self) -> &ModelState<T, DynamicAllocHandle<T>> {
@@ -103,7 +103,7 @@ where
 
     fn destroy(&mut self) {
         match self.state {
-            ModelState::Alive(ref handle) => {
+            ModelState::Awake(ref handle) => {
                 handle.destroy();
             }
             _ => panic!("Cannot destroy a dead handle"),
@@ -126,7 +126,7 @@ where
 {
     fn translate(&mut self, translation: glam::Vec3) {
         match self.state {
-            ModelState::Alive(ref mut handle) => {
+            ModelState::Awake(ref mut handle) => {
                 let mod_action = Box::new(move |data: &mut [T]| data.translate(translation));
 
                 let action = ModifyAction::new(0, handle.size(), mod_action);

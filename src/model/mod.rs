@@ -23,13 +23,13 @@ pub struct BufferLocation {
 pub enum ModelState<T, H> {
     Dormant(SimpleGeometry<T>),
     DormantIndexed(IndexedGeometry<T>),
-    Alive(Arc<H>),
+    Awake(Arc<H>),
     Destroyed,
 }
 
 impl<T, H> ModelState<T, H> {
     pub fn is_alive(&self) -> bool {
-        matches!(self, Self::Alive(_))
+        matches!(self, Self::Awake(_))
     }
 
     pub fn is_destroyed(&self) -> bool {
@@ -40,7 +40,7 @@ impl<T, H> ModelState<T, H> {
 pub trait Model<T: Translate + Rotate + Scale, H: AllocHandle<T>>:
     Translate + Rotate + Scale
 {
-    fn make_alive(&mut self, handle: Arc<H>);
+    fn wake(&mut self, handle: Arc<H>);
 
     fn destroy(&mut self) {}
     fn is_destroyed(&self) -> bool {
@@ -53,7 +53,7 @@ pub trait Model<T: Translate + Rotate + Scale, H: AllocHandle<T>>:
 pub trait IndexedModel<T: Translate + Rotate + Scale, H: AllocHandle<T>>:
     Translate + Rotate + Scale
 {
-    fn make_alive(&self, handle: Arc<H>, index_handle: Arc<H>);
+    fn wake(&self, handle: Arc<H>, index_handle: Arc<H>);
     fn destroy(&self) {}
     fn is_destroyed(&self) -> bool {
         false

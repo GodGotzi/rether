@@ -131,10 +131,10 @@ where
     T: Translate + Scale + Rotate,
     C: Translate + Scale + Rotate,
 {
-    fn make_alive(&mut self, handle: std::sync::Arc<StaticAllocHandle<T>>) {
+    fn wake(&mut self, handle: std::sync::Arc<StaticAllocHandle<T>>) {
         match self {
             Self::Root { state, .. } => {
-                *state = ModelState::Alive(handle);
+                *state = ModelState::Awake(handle);
             }
             Self::Node { .. } => {
                 panic!("Cannot make alive a node");
@@ -159,10 +159,10 @@ where
     T: Translate + Scale + Rotate,
     C: Translate + Scale + Rotate,
 {
-    fn make_alive(&mut self, handle: std::sync::Arc<DynamicAllocHandle<T>>) {
+    fn wake(&mut self, handle: std::sync::Arc<DynamicAllocHandle<T>>) {
         match self {
             Self::Root { state, .. } => {
-                *state = ModelState::Alive(handle);
+                *state = ModelState::Awake(handle);
             }
             Self::Node { .. } => {
                 panic!("Cannot make alive a node");
@@ -181,7 +181,7 @@ where
         match self {
             Self::Root { state, .. } => {
                 match state {
-                    ModelState::Alive(handle) => {
+                    ModelState::Awake(handle) => {
                         handle.destroy();
                     }
                     _ => panic!("Cannot destroy a dead handle"),
@@ -265,7 +265,7 @@ impl<T: Translate, C: Translate, H: AllocHandle<T>> Translate for TreeModel<T, C
                 ctx,
                 ..
             } => match state {
-                ModelState::Alive(handle) => {
+                ModelState::Awake(handle) => {
                     let mod_action = Box::new(move |data: &mut [T]| data.translate(translation));
 
                     let action = ModifyAction::new(0, handle.size(), mod_action);

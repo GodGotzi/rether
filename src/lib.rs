@@ -66,7 +66,7 @@ fn test() {
 
     let handle = alloc::BufferDynamicAlloc::allocate(&mut allocater, "test", 100000);
 
-    model.make_alive(handle);
+    model.wake(handle);
 
     println!("{:?}", allocater.size());
 
