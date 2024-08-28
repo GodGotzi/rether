@@ -133,24 +133,6 @@ where
     }
 }
 
-impl<T, C, H> TreeModel<T, C, H>
-where
-    C: Hitbox,
-    H: AllocHandle<T>,
-{
-    pub fn min_pos(&self) -> glam::Vec3 {
-        match self {
-            Self::Root { ctx, .. } | Self::Node { ctx, .. } => ctx.read().min(),
-        }
-    }
-
-    pub fn max_pos(&self) -> glam::Vec3 {
-        match self {
-            Self::Root { ctx, .. } | Self::Node { ctx, .. } => ctx.read().max(),
-        }
-    }
-}
-
 impl<T, C> Model<T, StaticAllocHandle<T>> for TreeModel<T, C, StaticAllocHandle<T>> {
     fn wake(&self, handle: std::sync::Arc<StaticAllocHandle<T>>) {
         match self {

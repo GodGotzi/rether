@@ -14,6 +14,7 @@ use super::{
     InteractiveModel, Model, ModelState, RotateModel, ScaleModel, TranslateModel,
 };
 
+#[derive(Debug)]
 pub struct BaseModel<T, C, H: AllocHandle<T>> {
     state: RwLock<ModelState<T, H>>,
     ctx: RwLock<C>,
