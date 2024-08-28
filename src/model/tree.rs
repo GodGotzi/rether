@@ -9,13 +9,10 @@ use crate::{
         interact::{Interactive, InteractiveModel},
         Hitbox, HitboxNode,
     },
-    Rotate, Scale, SimpleGeometry, Transform, Translate,
+    Rotate, Scale, Transform, Translate,
 };
 
-use super::{
-    geometry::{Geometry, IndexedGeometry},
-    Expandable, RotateModel, ScaleModel, TranslateModel,
-};
+use super::{geometry::Geometry, Expandable, RotateModel, ScaleModel, TranslateModel};
 
 #[derive(Debug)]
 pub enum TreeModel<T, C, H: AllocHandle<T>> {
@@ -36,7 +33,7 @@ impl<T, C, H> TreeModel<T, C, H>
 where
     H: AllocHandle<T>,
 {
-    pub fn root<M: Into<ModelState<T, H>>>(ctx: C, geometry: M) -> Self {
+    pub fn create_root<M: Into<ModelState<T, H>>>(ctx: C, geometry: M) -> Self {
         Self::Root {
             state: RwLock::new(geometry.into()),
             transform: RwLock::new(Transform::default()),
@@ -45,28 +42,35 @@ where
         }
     }
 
-    pub fn root_indexed(ctx: C, geometry: IndexedGeometry<T>) -> Self {
+    pub fn create_root_with_sub_handles<M: Into<ModelState<T, H>>>(
+        ctx: C,
+        geometry: M,
+        sub_handles: Vec<Self>,
+    ) -> Self {
         Self::Root {
-            state: RwLock::new(ModelState::DormantIndexed(geometry)),
+            state: RwLock::new(geometry.into()),
             transform: RwLock::new(Transform::default()),
-            sub_handles: Vec::new(),
+            sub_handles,
             ctx: RwLock::new(ctx),
         }
     }
 
-    pub fn root_simple(ctx: C, geometry: SimpleGeometry<T>) -> Self {
-        Self::Root {
-            state: RwLock::new(ModelState::Dormant(geometry)),
-            transform: RwLock::new(Transform::default()),
-            sub_handles: Vec::new(),
-            ctx: RwLock::new(ctx),
-        }
-    }
-
-    pub fn node(ctx: C, location: BufferLocation) -> Self {
+    pub fn create_node(ctx: C, location: BufferLocation) -> Self {
         Self::Node {
             location,
             sub_handles: Vec::new(),
+            ctx: RwLock::new(ctx),
+        }
+    }
+
+    fn create_node_with_sub_handles(
+        ctx: C,
+        location: BufferLocation,
+        sub_handles: Vec<Self>,
+    ) -> Self {
+        Self::Node {
+            location,
+            sub_handles,
             ctx: RwLock::new(ctx),
         }
     }

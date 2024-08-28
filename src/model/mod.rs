@@ -37,6 +37,18 @@ impl<T, H> ModelState<T, H> {
     }
 }
 
+impl<T, H> From<SimpleGeometry<T>> for ModelState<T, H> {
+    fn from(geometry: SimpleGeometry<T>) -> Self {
+        Self::Dormant(geometry)
+    }
+}
+
+impl<T, H> From<IndexedGeometry<T>> for ModelState<T, H> {
+    fn from(geometry: IndexedGeometry<T>) -> Self {
+        Self::DormantIndexed(geometry)
+    }
+}
+
 pub trait TranslateModel {
     fn translate(&self, translation: glam::Vec3);
 }
