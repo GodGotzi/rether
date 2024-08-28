@@ -52,6 +52,14 @@ where
     fn inner_nodes(&self) -> &[BaseModel<T, C, H>] {
         &[]
     }
+
+    fn max(&self) -> glam::Vec3 {
+        self.ctx.read().max()
+    }
+
+    fn min(&self) -> glam::Vec3 {
+        self.ctx.read().min()
+    }
 }
 
 impl<T, C, H> InteractiveModel for BaseModel<T, C, H>

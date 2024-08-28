@@ -19,6 +19,8 @@ pub trait Hitbox: std::fmt::Debug + Send + Sync {
 pub trait HitboxNode<M: HitboxNode<M>> {
     fn check_hit(&self, ray: &Ray) -> Option<f32>;
     fn inner_nodes(&self) -> &[M];
+    fn min(&self) -> Vec3;
+    fn max(&self) -> Vec3;
 }
 
 // Importing the Ray struct from the ray module in the super namespace

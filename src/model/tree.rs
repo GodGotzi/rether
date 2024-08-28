@@ -226,6 +226,18 @@ where
             Self::Node { sub_handles, .. } => sub_handles,
         }
     }
+
+    fn max(&self) -> glam::Vec3 {
+        match self {
+            Self::Root { ctx, .. } | Self::Node { ctx, .. } => ctx.read().max(),
+        }
+    }
+
+    fn min(&self) -> glam::Vec3 {
+        match self {
+            Self::Root { ctx, .. } | Self::Node { ctx, .. } => ctx.read().min(),
+        }
+    }
 }
 
 impl<T, C, H> InteractiveModel for TreeModel<T, C, H>
