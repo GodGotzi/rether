@@ -9,10 +9,13 @@ use crate::{
         interact::{Interactive, InteractiveModel},
         Hitbox, HitboxNode,
     },
-    Rotate, Scale, Transform, Translate,
+    Rotate, Scale, SimpleGeometry, Transform, Translate,
 };
 
-use super::{geometry::Geometry, Expandable, RotateModel, ScaleModel, TranslateModel};
+use super::{
+    geometry::{Geometry, IndexedGeometry},
+    Expandable, RotateModel, ScaleModel, TranslateModel,
+};
 
 #[derive(Debug)]
 pub enum TreeModel<T, C, H: AllocHandle<T>> {
@@ -27,6 +30,46 @@ pub enum TreeModel<T, C, H: AllocHandle<T>> {
         sub_handles: Vec<TreeModel<T, C, H>>,
         ctx: RwLock<C>,
     },
+}
+
+impl<T, C, H> TreeModel<T, C, H>
+where
+    H: AllocHandle<T>,
+{
+    pub fn root<M: Into<ModelState<T, H>>>(ctx: C, geometry: M) -> Self {
+        Self::Root {
+            state: RwLock::new(geometry.into()),
+            transform: RwLock::new(Transform::default()),
+            sub_handles: Vec::new(),
+            ctx: RwLock::new(ctx),
+        }
+    }
+
+    pub fn root_indexed(ctx: C, geometry: IndexedGeometry<T>) -> Self {
+        Self::Root {
+            state: RwLock::new(ModelState::DormantIndexed(geometry)),
+            transform: RwLock::new(Transform::default()),
+            sub_handles: Vec::new(),
+            ctx: RwLock::new(ctx),
+        }
+    }
+
+    pub fn root_simple(ctx: C, geometry: SimpleGeometry<T>) -> Self {
+        Self::Root {
+            state: RwLock::new(ModelState::Dormant(geometry)),
+            transform: RwLock::new(Transform::default()),
+            sub_handles: Vec::new(),
+            ctx: RwLock::new(ctx),
+        }
+    }
+
+    pub fn node(ctx: C, location: BufferLocation) -> Self {
+        Self::Node {
+            location,
+            sub_handles: Vec::new(),
+            ctx: RwLock::new(ctx),
+        }
+    }
 }
 
 impl<T, C, H> TreeModel<T, C, H>
