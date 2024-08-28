@@ -9,7 +9,7 @@ use super::{
 
 pub trait Hitbox: std::fmt::Debug + Send + Sync {
     fn check_hit(&self, ray: &Ray) -> Option<f32>;
-    fn expand(&mut self, _box: &dyn Hitbox);
+    fn expand_hitbox(&mut self, _box: &dyn Hitbox);
     fn set_enabled(&mut self, enabled: bool);
     fn enabled(&self) -> bool;
     fn get_min(&self) -> Vec3;

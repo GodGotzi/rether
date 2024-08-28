@@ -79,7 +79,7 @@ where
                         _ => panic!("Cannot expand an alive or dead handle"),
                     };
 
-                    self_ctx.get_mut().expand(ctx.get_mut());
+                    self_ctx.get_mut().expand_hitbox(ctx.get_mut());
 
                     let node = TreeModel::Node {
                         location: BufferLocation { offset, size },
@@ -94,7 +94,7 @@ where
                     sub_handles,
                     mut ctx,
                 } => {
-                    self_ctx.get_mut().expand(ctx.get_mut());
+                    self_ctx.get_mut().expand_hitbox(ctx.get_mut());
 
                     let node = TreeModel::Node {
                         location,
@@ -115,7 +115,7 @@ where
                     sub_handles,
                     mut ctx,
                 } => {
-                    self_ctx.get_mut().expand(ctx.get_mut());
+                    self_ctx.get_mut().expand_hitbox(ctx.get_mut());
 
                     other_location.offset += location.size;
                     location.size += other_location.size;
