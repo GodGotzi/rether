@@ -53,12 +53,12 @@ where
         &[]
     }
 
-    fn max(&self) -> glam::Vec3 {
-        self.ctx.read().max()
+    fn get_max(&self) -> glam::Vec3 {
+        self.ctx.read().get_max()
     }
 
-    fn min(&self) -> glam::Vec3 {
-        self.ctx.read().min()
+    fn get_min(&self) -> glam::Vec3 {
+        self.ctx.read().get_min()
     }
 }
 

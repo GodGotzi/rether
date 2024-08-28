@@ -227,15 +227,15 @@ where
         }
     }
 
-    fn max(&self) -> glam::Vec3 {
+    fn get_max(&self) -> glam::Vec3 {
         match self {
-            Self::Root { ctx, .. } | Self::Node { ctx, .. } => ctx.read().max(),
+            Self::Root { ctx, .. } | Self::Node { ctx, .. } => ctx.read().get_max(),
         }
     }
 
-    fn min(&self) -> glam::Vec3 {
+    fn get_min(&self) -> glam::Vec3 {
         match self {
-            Self::Root { ctx, .. } | Self::Node { ctx, .. } => ctx.read().min(),
+            Self::Root { ctx, .. } | Self::Node { ctx, .. } => ctx.read().get_min(),
         }
     }
 }

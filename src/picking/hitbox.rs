@@ -12,15 +12,15 @@ pub trait Hitbox: std::fmt::Debug + Send + Sync {
     fn expand(&mut self, _box: &dyn Hitbox);
     fn set_enabled(&mut self, enabled: bool);
     fn enabled(&self) -> bool;
-    fn min(&self) -> Vec3;
-    fn max(&self) -> Vec3;
+    fn get_min(&self) -> Vec3;
+    fn get_max(&self) -> Vec3;
 }
 
 pub trait HitboxNode<M: HitboxNode<M>> {
     fn check_hit(&self, ray: &Ray) -> Option<f32>;
     fn inner_nodes(&self) -> &[M];
-    fn min(&self) -> Vec3;
-    fn max(&self) -> Vec3;
+    fn get_min(&self) -> Vec3;
+    fn get_max(&self) -> Vec3;
 }
 
 // Importing the Ray struct from the ray module in the super namespace
