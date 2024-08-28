@@ -1,9 +1,7 @@
 use std::sync::Arc;
 
 use geometry::IndexedGeometry;
-use glam::Vec2;
 use parking_lot::RwLock;
-use winit::event::MouseButton;
 
 use crate::{alloc::AllocHandle, SimpleGeometry};
 
@@ -49,12 +47,6 @@ pub trait RotateModel {
 
 pub trait ScaleModel {
     fn scale(&self, scale: glam::Vec3);
-}
-
-pub trait InteractiveModel {
-    fn mouse_clicked(&self, button: MouseButton);
-    fn mouse_scroll(&self, delta: f32);
-    fn mouse_motion(&self, button: MouseButton, delta: Vec2);
 }
 
 pub trait Model<T, H: AllocHandle<T>> {

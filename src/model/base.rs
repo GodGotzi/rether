@@ -4,14 +4,17 @@ use parking_lot::RwLock;
 
 use crate::{
     alloc::{AllocHandle, DynamicAllocHandle, ModifyAction, StaticAllocHandle},
-    picking::{interact::Interactive, Hitbox, HitboxNode},
+    picking::{
+        interact::{Interactive, InteractiveModel},
+        Hitbox, HitboxNode,
+    },
     SimpleGeometry,
 };
 
 use super::{
     geometry::IndexedGeometry,
     transform::{Rotate, Scale, Translate},
-    InteractiveModel, Model, ModelState, RotateModel, ScaleModel, TranslateModel,
+    Model, ModelState, RotateModel, ScaleModel, TranslateModel,
 };
 
 #[derive(Debug)]
@@ -67,16 +70,16 @@ where
     C: Interactive,
     H: AllocHandle<T>,
 {
-    fn mouse_clicked(&self, button: winit::event::MouseButton) {
-        self.ctx.write().mouse_clicked(button);
+    fn clicked(&self, event: crate::picking::interact::ClickEvent) {
+        self.ctx.write().clicked(event);
     }
 
-    fn mouse_motion(&self, button: winit::event::MouseButton, delta: glam::Vec2) {
-        self.ctx.write().mouse_motion(button, delta);
+    fn drag(&self, event: crate::picking::interact::DragEvent) {
+        self.ctx.write().drag(event);
     }
 
-    fn mouse_scroll(&self, delta: f32) {
-        self.ctx.write().mouse_scroll(delta);
+    fn scroll(&self, event: crate::picking::interact::ScrollEvent) {
+        self.ctx.write().scroll(event);
     }
 }
 

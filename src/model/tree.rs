@@ -5,13 +5,14 @@ use parking_lot::RwLock;
 use crate::{
     alloc::{AllocHandle, DynamicAllocHandle, ModifyAction, StaticAllocHandle},
     model::{BufferLocation, Model, ModelState},
-    picking::{interact::Interactive, Hitbox, HitboxNode},
+    picking::{
+        interact::{Interactive, InteractiveModel},
+        Hitbox, HitboxNode,
+    },
     Rotate, Scale, Transform, Translate,
 };
 
-use super::{
-    geometry::Geometry, Expandable, InteractiveModel, RotateModel, ScaleModel, TranslateModel,
-};
+use super::{geometry::Geometry, Expandable, RotateModel, ScaleModel, TranslateModel};
 
 #[derive(Debug)]
 pub enum TreeModel<T, C, H: AllocHandle<T>> {
@@ -245,26 +246,26 @@ where
     C: Interactive,
     H: AllocHandle<T>,
 {
-    fn mouse_clicked(&self, button: winit::event::MouseButton) {
+    fn clicked(&self, event: crate::picking::interact::ClickEvent) {
         match self {
             Self::Root { ctx, .. } | Self::Node { ctx, .. } => {
-                ctx.write().mouse_clicked(button);
+                ctx.write().clicked(event);
             }
         }
     }
 
-    fn mouse_motion(&self, button: winit::event::MouseButton, delta: glam::Vec2) {
+    fn drag(&self, event: crate::picking::interact::DragEvent) {
         match self {
             Self::Root { ctx, .. } | Self::Node { ctx, .. } => {
-                ctx.write().mouse_motion(button, delta);
+                ctx.write().drag(event);
             }
         }
     }
 
-    fn mouse_scroll(&self, delta: f32) {
+    fn scroll(&self, event: crate::picking::interact::ScrollEvent) {
         match self {
             Self::Root { ctx, .. } | Self::Node { ctx, .. } => {
-                ctx.write().mouse_scroll(delta);
+                ctx.write().scroll(event);
             }
         }
     }
