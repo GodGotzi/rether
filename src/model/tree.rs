@@ -42,7 +42,7 @@ where
         }
     }
 
-    pub fn create_root_with_sub_handles<M: Into<ModelState<T, H>>>(
+    pub fn create_root_with_models<M: Into<ModelState<T, H>>>(
         ctx: C,
         geometry: M,
         sub_handles: Vec<Self>,
@@ -63,7 +63,7 @@ where
         }
     }
 
-    pub fn create_node_with_sub_handles(
+    pub fn create_node_with_models(
         ctx: C,
         location: BufferLocation,
         sub_handles: Vec<Self>,
