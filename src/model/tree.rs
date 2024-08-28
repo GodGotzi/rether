@@ -63,7 +63,7 @@ where
         }
     }
 
-    fn create_node_with_sub_handles(
+    pub fn create_node_with_sub_handles(
         ctx: C,
         location: BufferLocation,
         sub_handles: Vec<Self>,
