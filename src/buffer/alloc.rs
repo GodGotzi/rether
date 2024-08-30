@@ -52,6 +52,9 @@ pub struct StaticAllocHandle<T> {
     action_sender: Sender<ModifyAction<T>>,
 }
 
+unsafe impl<T> Send for StaticAllocHandle<T> {}
+unsafe impl<T> Sync for StaticAllocHandle<T> {}
+
 impl<T> StaticAllocHandle<T> {
     pub fn new(
         id: &str,
@@ -115,6 +118,9 @@ pub struct DynamicAllocHandle<T> {
 
     action_sender: Sender<ModifyAction<T>>,
 }
+
+unsafe impl<T> Send for DynamicAllocHandle<T> {}
+unsafe impl<T> Sync for DynamicAllocHandle<T> {}
 
 impl<T> std::hash::Hash for DynamicAllocHandle<T> {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
