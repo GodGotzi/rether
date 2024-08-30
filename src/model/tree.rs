@@ -290,13 +290,13 @@ where
 
 impl<T, C, H> InteractiveModel for TreeModel<T, C, H>
 where
-    C: Interactive,
+    C: Interactive<Model = TreeModel<T, C, H>>,
     H: AllocHandle<T>,
 {
     fn clicked(&self, event: crate::picking::interact::ClickEvent) {
         match self {
             Self::Root { ctx, .. } | Self::Node { ctx, .. } => {
-                ctx.write().clicked(event);
+                ctx.write().clicked(event)(self);
             }
         }
     }
@@ -304,7 +304,7 @@ where
     fn drag(&self, event: crate::picking::interact::DragEvent) {
         match self {
             Self::Root { ctx, .. } | Self::Node { ctx, .. } => {
-                ctx.write().drag(event);
+                ctx.write().drag(event)(self);
             }
         }
     }
@@ -312,7 +312,7 @@ where
     fn scroll(&self, event: crate::picking::interact::ScrollEvent) {
         match self {
             Self::Root { ctx, .. } | Self::Node { ctx, .. } => {
-                ctx.write().scroll(event);
+                ctx.write().scroll(event)(self);
             }
         }
     }

@@ -67,19 +67,19 @@ where
 
 impl<T, C, H> InteractiveModel for BaseModel<T, C, H>
 where
-    C: Interactive,
+    C: Interactive<Model = BaseModel<T, C, H>>,
     H: AllocHandle<T>,
 {
     fn clicked(&self, event: crate::picking::interact::ClickEvent) {
-        self.ctx.write().clicked(event);
+        self.ctx.write().clicked(event)(self);
     }
 
     fn drag(&self, event: crate::picking::interact::DragEvent) {
-        self.ctx.write().drag(event);
+        self.ctx.write().drag(event)(self);
     }
 
     fn scroll(&self, event: crate::picking::interact::ScrollEvent) {
-        self.ctx.write().scroll(event);
+        self.ctx.write().scroll(event)(self);
     }
 }
 
