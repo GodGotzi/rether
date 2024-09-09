@@ -13,7 +13,7 @@ use crate::{
 };
 
 use super::{geometry::Geometry, Expandable, RotateModel, ScaleModel, TranslateModel};
-
+// rethink tree cause usage is pretty complicated
 #[derive(Debug)]
 pub enum TreeModel<T, C, H: AllocHandle<T>> {
     Root {
