@@ -186,27 +186,30 @@ impl RawBuffer {
 
         queue.submit(std::iter::once(encoder.finish()));
 
-        let once_cell = OnceCell::new();
-
-        let cloned_once_cell = once_cell.clone();
+        let (sender, receiver) = flume::bounded(1);
 
         read_buffer
             .slice(..)
-            .map_async(wgpu::MapMode::Read, move |result| {
-                cloned_once_cell.set(result).unwrap();
+            .map_async(wgpu::MapMode::Read, move |_| {
+                sender.send(()).unwrap();
             });
         device.poll(wgpu::Maintain::Wait);
 
-        if let Some(Ok(())) = once_cell.get() {
-            let raw_data = read_buffer.slice(..).get_mapped_range();
+        match receiver.recv() {
+            Ok(_) => {
+                let raw_data = read_buffer.slice(..).get_mapped_range();
 
-            let mut data = bytemuck::cast_slice::<u8, T>(&raw_data).to_vec();
-            modify_action.act(&mut data);
+                let mut data = bytemuck::cast_slice::<u8, T>(&raw_data).to_vec();
+                modify_action.act(&mut data);
 
-            read_buffer.unmap();
-            read_buffer.destroy();
+                drop(raw_data);
 
-            self.write(queue, modify_action.offset, &data);
+                read_buffer.unmap();
+                read_buffer.destroy();
+
+                self.write(queue, modify_action.offset, &data);
+            }
+            Err(_) => panic!("Failed to map read buffer"),
         }
     }
 }
