@@ -169,7 +169,7 @@ impl RawBuffer {
             label: Some("Read Buffer"),
             size: size_bytes as BufferAddress,
             usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ,
-            mapped_at_creation: true,
+            mapped_at_creation: false,
         });
 
         let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
