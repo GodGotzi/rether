@@ -4,10 +4,6 @@ use parking_lot::RwLock;
 
 use crate::{
     alloc::{AllocHandle, DynamicAllocHandle, ModifyAction, StaticAllocHandle},
-    picking::{
-        interact::{Interactive, InteractiveModel},
-        Hitbox, HitboxNode,
-    },
     SimpleGeometry,
 };
 
@@ -18,75 +14,31 @@ use super::{
 };
 
 #[derive(Debug)]
-pub struct BaseModel<T, C, H: AllocHandle<T>> {
+pub struct BaseModel<T, H: AllocHandle<T>> {
     state: RwLock<ModelState<T, H>>,
-    ctx: RwLock<C>,
 }
 
-impl<T, C, H> BaseModel<T, C, H>
+impl<T, H> BaseModel<T, H>
 where
     H: AllocHandle<T>,
 {
-    pub fn simple(ctx: C, geometry: SimpleGeometry<T>) -> Self {
+    pub fn simple(geometry: SimpleGeometry<T>) -> Self {
         Self {
             state: RwLock::new(ModelState::Dormant(geometry)),
-            ctx: RwLock::new(ctx),
         }
     }
 
-    pub fn indexed(ctx: C, geometry: IndexedGeometry<T>) -> Self {
+    pub fn indexed(geometry: IndexedGeometry<T>) -> Self {
         Self {
             state: RwLock::new(ModelState::DormantIndexed(geometry)),
-            ctx: RwLock::new(ctx),
         }
     }
 }
 
-impl<T, C, H> HitboxNode<BaseModel<T, C, H>> for BaseModel<T, C, H>
+impl<T> Model<T, StaticAllocHandle<T>> for BaseModel<T, StaticAllocHandle<T>>
 where
     T: Translate + Scale + Rotate,
-    C: Translate + Scale + Rotate + Hitbox,
-    H: AllocHandle<T>,
-{
-    fn check_hit(&self, ray: &crate::picking::Ray) -> Option<f32> {
-        self.ctx.read().check_hit(ray)
-    }
-
-    fn inner_nodes(&self) -> &[BaseModel<T, C, H>] {
-        &[]
-    }
-
-    fn get_max(&self) -> glam::Vec3 {
-        self.ctx.read().get_max()
-    }
-
-    fn get_min(&self) -> glam::Vec3 {
-        self.ctx.read().get_min()
-    }
-}
-
-impl<T, C, H> InteractiveModel for BaseModel<T, C, H>
-where
-    C: Interactive<Model = BaseModel<T, C, H>>,
-    H: AllocHandle<T>,
-{
-    fn clicked(&self, event: crate::picking::interact::ClickEvent) {
-        self.ctx.write().clicked(event)(self);
-    }
-
-    fn drag(&self, event: crate::picking::interact::DragEvent) {
-        self.ctx.write().drag(event)(self);
-    }
-
-    fn scroll(&self, event: crate::picking::interact::ScrollEvent) {
-        self.ctx.write().scroll(event)(self);
-    }
-}
-
-impl<T, C> Model<T, StaticAllocHandle<T>> for BaseModel<T, C, StaticAllocHandle<T>>
-where
-    T: Translate + Scale + Rotate,
-    C: Translate + Scale + Rotate,
+    // C: Translate + Scale + Rotate,
 {
     fn wake(&self, handle: std::sync::Arc<StaticAllocHandle<T>>) {
         *self.state.write() = ModelState::Awake(handle);
@@ -101,10 +53,10 @@ where
     }
 }
 
-impl<T, C> Model<T, DynamicAllocHandle<T>> for BaseModel<T, C, DynamicAllocHandle<T>>
+impl<T> Model<T, DynamicAllocHandle<T>> for BaseModel<T, DynamicAllocHandle<T>>
 where
     T: Translate + Scale + Rotate,
-    C: Translate + Scale + Rotate,
+    // C: Translate + Scale + Rotate,
 {
     fn wake(&self, handle: std::sync::Arc<DynamicAllocHandle<T>>) {
         *self.state.write() = ModelState::Awake(handle);
@@ -131,10 +83,9 @@ where
 }
 
 // Translate, Rotate and Scale are implemented for BaseModel
-impl<T, C, H> TranslateModel for BaseModel<T, C, H>
+impl<T, H> TranslateModel for BaseModel<T, H>
 where
     T: Translate,
-    C: Translate,
     H: AllocHandle<T>,
 {
     fn translate(&self, translation: glam::Vec3) {
@@ -154,15 +105,12 @@ where
             }
             _ => panic!("Cannot translate a dead handle"),
         }
-
-        self.ctx.write().translate(translation);
     }
 }
 
-impl<T, C, H> RotateModel for BaseModel<T, C, H>
+impl<T, H> RotateModel for BaseModel<T, H>
 where
     T: Rotate,
-    C: Rotate,
     H: AllocHandle<T>,
 {
     fn rotate(&self, rotation: glam::Quat) {
@@ -182,15 +130,12 @@ where
             }
             _ => panic!("Cannot rotate a dead handle"),
         }
-
-        self.ctx.write().rotate(rotation);
     }
 }
 
-impl<T, C, H> ScaleModel for BaseModel<T, C, H>
+impl<T, H> ScaleModel for BaseModel<T, H>
 where
     T: Scale,
-    C: Scale,
     H: AllocHandle<T>,
 {
     fn scale(&self, scale: glam::Vec3) {
@@ -210,7 +155,5 @@ where
             }
             _ => panic!("Cannot scale a dead handle"),
         }
-
-        self.ctx.write().scale(scale);
     }
 }

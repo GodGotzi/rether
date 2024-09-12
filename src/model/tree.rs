@@ -5,81 +5,66 @@ use parking_lot::RwLock;
 use crate::{
     alloc::{AllocHandle, DynamicAllocHandle, ModifyAction, StaticAllocHandle},
     model::{BufferLocation, Model, ModelState},
-    picking::{
-        interact::{Interactive, InteractiveModel},
-        Hitbox, HitboxNode,
-    },
     Rotate, Scale, Transform, Translate,
 };
 
-use super::{geometry::Geometry, Expandable, RotateModel, ScaleModel, TranslateModel};
+use super::{RotateModel, ScaleModel, TranslateModel};
 // rethink tree cause usage is pretty complicated
 #[derive(Debug)]
-pub enum TreeModel<T, C, H: AllocHandle<T>> {
+pub enum TreeModel<S, T, H: AllocHandle<T>> {
     Root {
         state: RwLock<ModelState<T, H>>,
         transform: RwLock<Transform>,
-        sub_handles: Vec<TreeModel<T, C, H>>,
-        ctx: RwLock<C>,
+        sub_handles: Vec<S>,
     },
     Node {
         location: BufferLocation,
-        sub_handles: Vec<TreeModel<T, C, H>>,
-        ctx: RwLock<C>,
+        sub_handles: Vec<S>,
     },
 }
 
-impl<T, C, H> TreeModel<T, C, H>
+impl<S, T, H> TreeModel<S, T, H>
 where
     H: AllocHandle<T>,
 {
-    pub fn create_root<M: Into<ModelState<T, H>>>(ctx: C, geometry: M) -> Self {
+    pub fn create_root<M: Into<ModelState<T, H>>>(geometry: M) -> Self {
         Self::Root {
             state: RwLock::new(geometry.into()),
             transform: RwLock::new(Transform::default()),
             sub_handles: Vec::new(),
-            ctx: RwLock::new(ctx),
         }
     }
 
     pub fn create_root_with_models<M: Into<ModelState<T, H>>>(
-        ctx: C,
         geometry: M,
-        sub_handles: Vec<Self>,
+        sub_handles: Vec<S>,
     ) -> Self {
         Self::Root {
             state: RwLock::new(geometry.into()),
             transform: RwLock::new(Transform::default()),
             sub_handles,
-            ctx: RwLock::new(ctx),
         }
     }
 
-    pub fn create_node(ctx: C, location: BufferLocation) -> Self {
+    pub fn create_node(location: BufferLocation) -> Self {
         Self::Node {
             location,
             sub_handles: Vec::new(),
-            ctx: RwLock::new(ctx),
         }
     }
 
-    pub fn create_node_with_models(
-        ctx: C,
-        location: BufferLocation,
-        sub_handles: Vec<Self>,
-    ) -> Self {
+    pub fn create_node_with_models(location: BufferLocation, sub_handles: Vec<S>) -> Self {
         Self::Node {
             location,
             sub_handles,
-            ctx: RwLock::new(ctx),
         }
     }
 }
 
-impl<T, C, H> TreeModel<T, C, H>
+/*
+impl<T, H> TreeModel<T, H>
 where
     T: Clone,
-    C: Hitbox,
     H: AllocHandle<T>,
 {
     pub fn add_child(&mut self, other: Self) {
@@ -180,8 +165,9 @@ where
         }
     }
 }
+*/
 
-impl<T, C> Model<T, StaticAllocHandle<T>> for TreeModel<T, C, StaticAllocHandle<T>> {
+impl<S, T> Model<T, StaticAllocHandle<T>> for TreeModel<S, T, StaticAllocHandle<T>> {
     fn wake(&self, handle: std::sync::Arc<StaticAllocHandle<T>>) {
         match self {
             Self::Root { state, .. } => {
@@ -205,10 +191,9 @@ impl<T, C> Model<T, StaticAllocHandle<T>> for TreeModel<T, C, StaticAllocHandle<
     }
 }
 
-impl<T, C> Model<T, DynamicAllocHandle<T>> for TreeModel<T, C, DynamicAllocHandle<T>>
+impl<S, T> Model<T, DynamicAllocHandle<T>> for TreeModel<S, T, DynamicAllocHandle<T>>
 where
     T: Translate + Scale + Rotate,
-    C: Translate + Scale + Rotate,
 {
     fn wake(&self, handle: std::sync::Arc<DynamicAllocHandle<T>>) {
         match self {
@@ -256,77 +241,13 @@ where
     }
 }
 
-impl<T, C, H> HitboxNode<TreeModel<T, C, H>> for TreeModel<T, C, H>
-where
-    T: Translate + Scale + Rotate,
-    C: Translate + Scale + Rotate + Hitbox,
-    H: AllocHandle<T>,
-{
-    fn check_hit(&self, ray: &crate::picking::Ray) -> Option<f32> {
-        match self {
-            Self::Root { ctx, .. } | Self::Node { ctx, .. } => ctx.read().check_hit(ray),
-        }
-    }
-
-    fn inner_nodes(&self) -> &[TreeModel<T, C, H>] {
-        match self {
-            Self::Root { sub_handles, .. } => sub_handles,
-            Self::Node { sub_handles, .. } => sub_handles,
-        }
-    }
-
-    fn get_max(&self) -> glam::Vec3 {
-        match self {
-            Self::Root { ctx, .. } | Self::Node { ctx, .. } => ctx.read().get_max(),
-        }
-    }
-
-    fn get_min(&self) -> glam::Vec3 {
-        match self {
-            Self::Root { ctx, .. } | Self::Node { ctx, .. } => ctx.read().get_min(),
-        }
-    }
-}
-
-impl<T, C, H> InteractiveModel for TreeModel<T, C, H>
-where
-    C: Interactive<Model = TreeModel<T, C, H>>,
-    H: AllocHandle<T>,
-{
-    fn clicked(&self, event: crate::picking::interact::ClickEvent) {
-        match self {
-            Self::Root { ctx, .. } | Self::Node { ctx, .. } => {
-                ctx.write().clicked(event)(self);
-            }
-        }
-    }
-
-    fn drag(&self, event: crate::picking::interact::DragEvent) {
-        match self {
-            Self::Root { ctx, .. } | Self::Node { ctx, .. } => {
-                ctx.write().drag(event)(self);
-            }
-        }
-    }
-
-    fn scroll(&self, event: crate::picking::interact::ScrollEvent) {
-        match self {
-            Self::Root { ctx, .. } | Self::Node { ctx, .. } => {
-                ctx.write().scroll(event)(self);
-            }
-        }
-    }
-}
-
-impl<T: Translate, C: Translate, H: AllocHandle<T>> TranslateModel for TreeModel<T, C, H> {
+impl<S: TranslateModel, T: Translate, H: AllocHandle<T>> TranslateModel for TreeModel<S, T, H> {
     fn translate(&self, translation: glam::Vec3) {
         match self {
             Self::Root {
                 state,
                 sub_handles,
-                ctx,
                 transform,
-                ..
             } => {
                 transform.write().translate(translation);
                 match &mut *state.write() {
@@ -338,16 +259,12 @@ impl<T: Translate, C: Translate, H: AllocHandle<T>> TranslateModel for TreeModel
 
                         handle.send_action(action).expect("Failed to send action");
 
-                        ctx.write().translate(translation);
-
                         for handle in sub_handles.iter() {
                             handle.translate(translation);
                         }
                     }
                     ModelState::Dormant(geometry) => {
                         geometry.translate(translation);
-
-                        ctx.write().translate(translation);
 
                         for handle in sub_handles.iter() {
                             handle.translate(translation);
@@ -356,8 +273,6 @@ impl<T: Translate, C: Translate, H: AllocHandle<T>> TranslateModel for TreeModel
                     ModelState::DormantIndexed(geometry) => {
                         geometry.translate(translation);
 
-                        ctx.write().translate(translation);
-
                         for handle in sub_handles.iter() {
                             handle.translate(translation);
                         }
@@ -365,11 +280,7 @@ impl<T: Translate, C: Translate, H: AllocHandle<T>> TranslateModel for TreeModel
                     _ => panic!("Cannot translate a dead handle"),
                 }
             }
-            Self::Node {
-                ctx, sub_handles, ..
-            } => {
-                ctx.write().translate(translation);
-
+            Self::Node { sub_handles, .. } => {
                 for handle in sub_handles.iter() {
                     handle.translate(translation);
                 }
@@ -378,13 +289,12 @@ impl<T: Translate, C: Translate, H: AllocHandle<T>> TranslateModel for TreeModel
     }
 }
 
-impl<T: Rotate, C: Rotate, H: AllocHandle<T>> RotateModel for TreeModel<T, C, H> {
+impl<S: RotateModel, T: Rotate, H: AllocHandle<T>> RotateModel for TreeModel<S, T, H> {
     fn rotate(&self, rotation: glam::Quat) {
         match self {
             Self::Root {
                 state,
                 sub_handles,
-                ctx,
                 transform,
                 ..
             } => {
@@ -397,16 +307,12 @@ impl<T: Rotate, C: Rotate, H: AllocHandle<T>> RotateModel for TreeModel<T, C, H>
 
                         handle.send_action(action).expect("Failed to send action");
 
-                        ctx.write().rotate(rotation);
-
                         for handle in sub_handles.iter() {
                             handle.rotate(rotation);
                         }
                     }
                     ModelState::Dormant(geometry) => {
                         geometry.rotate(rotation);
-
-                        ctx.write().rotate(rotation);
 
                         for handle in sub_handles.iter() {
                             handle.rotate(rotation);
@@ -415,8 +321,6 @@ impl<T: Rotate, C: Rotate, H: AllocHandle<T>> RotateModel for TreeModel<T, C, H>
                     ModelState::DormantIndexed(geometry) => {
                         geometry.rotate(rotation);
 
-                        ctx.write().rotate(rotation);
-
                         for handle in sub_handles.iter() {
                             handle.rotate(rotation);
                         }
@@ -424,11 +328,7 @@ impl<T: Rotate, C: Rotate, H: AllocHandle<T>> RotateModel for TreeModel<T, C, H>
                     _ => panic!("Cannot rotate a dead handle"),
                 }
             }
-            Self::Node {
-                ctx, sub_handles, ..
-            } => {
-                ctx.write().rotate(rotation);
-
+            Self::Node { sub_handles, .. } => {
                 for handle in sub_handles.iter() {
                     handle.rotate(rotation);
                 }
@@ -437,13 +337,12 @@ impl<T: Rotate, C: Rotate, H: AllocHandle<T>> RotateModel for TreeModel<T, C, H>
     }
 }
 
-impl<T: Scale, C: Scale, H: AllocHandle<T>> ScaleModel for TreeModel<T, C, H> {
+impl<S: ScaleModel, T: Scale, H: AllocHandle<T>> ScaleModel for TreeModel<S, T, H> {
     fn scale(&self, scale: glam::Vec3) {
         match self {
             Self::Root {
                 state,
                 sub_handles,
-                ctx,
                 transform,
                 ..
             } => {
@@ -456,16 +355,12 @@ impl<T: Scale, C: Scale, H: AllocHandle<T>> ScaleModel for TreeModel<T, C, H> {
 
                         handle.send_action(action).expect("Failed to send action");
 
-                        ctx.write().scale(scale);
-
                         for handle in sub_handles.iter() {
                             handle.scale(scale);
                         }
                     }
                     ModelState::Dormant(geometry) => {
                         geometry.scale(scale);
-
-                        ctx.write().scale(scale);
 
                         for handle in sub_handles.iter() {
                             handle.scale(scale);
@@ -474,8 +369,6 @@ impl<T: Scale, C: Scale, H: AllocHandle<T>> ScaleModel for TreeModel<T, C, H> {
                     ModelState::DormantIndexed(geometry) => {
                         geometry.scale(scale);
 
-                        ctx.write().scale(scale);
-
                         for handle in sub_handles.iter() {
                             handle.scale(scale);
                         }
@@ -483,11 +376,7 @@ impl<T: Scale, C: Scale, H: AllocHandle<T>> ScaleModel for TreeModel<T, C, H> {
                     _ => panic!("Cannot scale a dead handle"),
                 }
             }
-            Self::Node {
-                ctx, sub_handles, ..
-            } => {
-                ctx.write().scale(scale);
-
+            Self::Node { sub_handles, .. } => {
                 for handle in sub_handles.iter() {
                     handle.scale(scale);
                 }
