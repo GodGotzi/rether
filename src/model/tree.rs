@@ -21,6 +21,9 @@ pub enum TreeModel<S, T, H: AllocHandle<T>> {
         location: BufferLocation,
         sub_handles: Vec<S>,
     },
+    Leaf {
+        location: BufferLocation,
+    },
 }
 
 impl<S, T, H> TreeModel<S, T, H>
@@ -59,113 +62,15 @@ where
             sub_handles,
         }
     }
-}
 
-/*
-impl<T, H> TreeModel<T, H>
-where
-    T: Clone,
-    H: AllocHandle<T>,
-{
-    pub fn add_child(&mut self, other: Self) {
+    pub fn sub_handles(&self) -> Option<&Vec<S>> {
         match self {
-            TreeModel::Root {
-                state: self_state,
-                sub_handles: self_sub_handles,
-                ctx: self_ctx,
-                ..
-            } => match other {
-                TreeModel::Root {
-                    mut state,
-                    sub_handles,
-                    mut ctx,
-                    ..
-                } => {
-                    let (offset, size) = match self_state.get_mut() {
-                        ModelState::Dormant(geometry) => match state.get_mut() {
-                            ModelState::Dormant(other_geometry) => {
-                                let offset = geometry.data_len();
-
-                                geometry.expand(other_geometry);
-
-                                (offset, other_geometry.data_len())
-                            }
-                            ModelState::DormantIndexed(_) => {
-                                panic!("Cannot expand a dormant geometry with an indexed geometry");
-                            }
-                            _ => panic!("Cannot expand an alive or dead handle"),
-                        },
-                        ModelState::DormantIndexed(geometry) => match state.get_mut() {
-                            ModelState::Dormant(_) => {
-                                panic!("Cannot expand a dormant geometry with an indexed geometry");
-                            }
-                            ModelState::DormantIndexed(other_geometry) => {
-                                let offset = geometry.data_len();
-
-                                geometry.expand(other_geometry);
-
-                                (offset, other_geometry.data_len())
-                            }
-                            _ => panic!("Cannot expand an alive or dead handle"),
-                        },
-                        _ => panic!("Cannot expand an alive or dead handle"),
-                    };
-
-                    self_ctx.get_mut().expand_hitbox(ctx.get_mut());
-
-                    let node = TreeModel::Node {
-                        location: BufferLocation { offset, size },
-                        sub_handles,
-                        ctx,
-                    };
-
-                    self_sub_handles.push(node);
-                }
-                TreeModel::Node {
-                    location,
-                    sub_handles,
-                    mut ctx,
-                } => {
-                    self_ctx.get_mut().expand_hitbox(ctx.get_mut());
-
-                    let node = TreeModel::Node {
-                        location,
-                        sub_handles,
-                        ctx,
-                    };
-
-                    self_sub_handles.push(node);
-                }
-            },
-            TreeModel::Node {
-                location,
-                sub_handles: self_sub_handles,
-                ctx: self_ctx,
-            } => match other {
-                TreeModel::Node {
-                    location: mut other_location,
-                    sub_handles,
-                    mut ctx,
-                } => {
-                    self_ctx.get_mut().expand_hitbox(ctx.get_mut());
-
-                    other_location.offset += location.size;
-                    location.size += other_location.size;
-
-                    let node = TreeModel::Node {
-                        location: other_location,
-                        sub_handles,
-                        ctx,
-                    };
-
-                    self_sub_handles.push(node);
-                }
-                _ => panic!("Cannot expand a node with a root"),
-            },
+            Self::Root { sub_handles, .. } => Some(sub_handles),
+            Self::Node { sub_handles, .. } => Some(sub_handles),
+            Self::Leaf { .. } => None,
         }
     }
 }
-*/
 
 impl<S, T> Model<T, StaticAllocHandle<T>> for TreeModel<S, T, StaticAllocHandle<T>> {
     fn wake(&self, handle: std::sync::Arc<StaticAllocHandle<T>>) {
@@ -173,8 +78,8 @@ impl<S, T> Model<T, StaticAllocHandle<T>> for TreeModel<S, T, StaticAllocHandle<
             Self::Root { state, .. } => {
                 *state.write() = ModelState::Awake(handle);
             }
-            Self::Node { .. } => {
-                panic!("Cannot make alive a node");
+            Self::Node { .. } | Self::Leaf { .. } => {
+                panic!("Cannot wake a node or leaf");
             }
         }
     }
@@ -182,7 +87,7 @@ impl<S, T> Model<T, StaticAllocHandle<T>> for TreeModel<S, T, StaticAllocHandle<
     fn state(&self) -> &RwLock<ModelState<T, StaticAllocHandle<T>>> {
         match self {
             Self::Root { state, .. } => state,
-            Self::Node { .. } => panic!("Cannot get state from node"),
+            Self::Node { .. } | Self::Leaf { .. } => panic!("Cannot get state from node or leaf"),
         }
     }
 
@@ -191,17 +96,14 @@ impl<S, T> Model<T, StaticAllocHandle<T>> for TreeModel<S, T, StaticAllocHandle<
     }
 }
 
-impl<S, T> Model<T, DynamicAllocHandle<T>> for TreeModel<S, T, DynamicAllocHandle<T>>
-where
-    T: Translate + Scale + Rotate,
-{
+impl<S, T> Model<T, DynamicAllocHandle<T>> for TreeModel<S, T, DynamicAllocHandle<T>> {
     fn wake(&self, handle: std::sync::Arc<DynamicAllocHandle<T>>) {
         match self {
             Self::Root { state, .. } => {
                 *state.write() = ModelState::Awake(handle);
             }
-            Self::Node { .. } => {
-                panic!("Cannot make alive a node");
+            Self::Node { .. } | Self::Leaf { .. } => {
+                panic!("Cannot wake a node or leaf");
             }
         }
     }
@@ -209,7 +111,7 @@ where
     fn state(&self) -> &RwLock<ModelState<T, DynamicAllocHandle<T>>> {
         match self {
             Self::Root { state, .. } => state,
-            Self::Node { .. } => panic!("Cannot get state from node"),
+            Self::Node { .. } | Self::Leaf { .. } => panic!("Cannot get state from node or leaf"),
         }
     }
 
@@ -225,8 +127,8 @@ where
 
                 *state.write() = ModelState::Destroyed;
             }
-            Self::Node { .. } => {
-                panic!("Cannot destroy a node");
+            Self::Node { .. } | Self::Leaf { .. } => {
+                panic!("Cannot destroy a node or leaf");
             }
         }
     }
@@ -234,8 +136,8 @@ where
     fn is_destroyed(&self) -> bool {
         match self {
             Self::Root { state, .. } => state.read().is_destroyed(),
-            Self::Node { .. } => {
-                panic!("Cannot check if a node is destroyed");
+            Self::Node { .. } | Self::Leaf { .. } => {
+                panic!("Cannot check if a node or leaf is destroyed");
             }
         }
     }
@@ -285,6 +187,7 @@ impl<S: TranslateModel, T: Translate, H: AllocHandle<T>> TranslateModel for Tree
                     handle.translate(translation);
                 }
             }
+            _ => {}
         }
     }
 }
@@ -333,6 +236,7 @@ impl<S: RotateModel, T: Rotate, H: AllocHandle<T>> RotateModel for TreeModel<S, 
                     handle.rotate(rotation);
                 }
             }
+            _ => {}
         }
     }
 }
@@ -381,6 +285,7 @@ impl<S: ScaleModel, T: Scale, H: AllocHandle<T>> ScaleModel for TreeModel<S, T, 
                     handle.scale(scale);
                 }
             }
+            _ => {}
         }
     }
 }

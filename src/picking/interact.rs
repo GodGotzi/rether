@@ -24,14 +24,6 @@ pub struct ScrollEvent {
     pub action: Action,
 }
 
-pub trait Interactive {
-    type Model: InteractiveModel;
-
-    fn clicked(&mut self, event: ClickEvent) -> impl FnOnce(&Self::Model);
-    fn scroll(&mut self, event: ScrollEvent) -> impl FnOnce(&Self::Model);
-    fn drag(&mut self, event: DragEvent) -> impl FnOnce(&Self::Model);
-}
-
 pub trait InteractiveModel {
     fn clicked(&self, event: ClickEvent);
     fn drag(&self, event: DragEvent);
