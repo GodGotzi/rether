@@ -1,10 +1,20 @@
 use glam::Mat4;
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct Transform {
     pub translation: glam::Vec3,
     pub rotation: glam::Quat,
     pub scale: glam::Vec3,
+}
+
+impl Default for Transform {
+    fn default() -> Self {
+        Self {
+            translation: glam::Vec3::ZERO,
+            rotation: glam::Quat::IDENTITY,
+            scale: glam::Vec3::ONE,
+        }
+    }
 }
 
 pub trait Translate {

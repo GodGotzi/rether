@@ -3,7 +3,7 @@ use std::sync::Arc;
 use geometry::IndexedGeometry;
 use parking_lot::RwLock;
 
-use crate::{alloc::AllocHandle, SimpleGeometry};
+use crate::{alloc::AllocHandle, Rotate, Scale, SimpleGeometry, Transform, Translate};
 
 mod base;
 pub mod geometry;
@@ -61,24 +61,31 @@ pub trait ScaleModel {
     fn scale(&self, scale: glam::Vec3);
 }
 
-pub trait Model<T, H: AllocHandle<T>> {
+pub trait TransformModel: TranslateModel + RotateModel + ScaleModel {}
+
+pub trait Model<T: Translate + Rotate + Scale, H: AllocHandle<T>>:
+    TranslateModel + RotateModel + ScaleModel
+{
     fn wake(&self, handle: Arc<H>);
 
     fn destroy(&self) {}
     fn is_destroyed(&self) -> bool {
         false
     }
-
+    fn transform(&self) -> Transform;
     fn state(&self) -> &RwLock<ModelState<T, H>>;
 }
 
-pub trait IndexedModel<T, H: AllocHandle<T>> {
+pub trait IndexedModel<T: Translate + Rotate + Scale, H: AllocHandle<T>>:
+    TranslateModel + RotateModel + ScaleModel
+{
     fn wake(&self, handle: Arc<H>, index_handle: Arc<H>);
     fn destroy(&self) {}
     fn is_destroyed(&self) -> bool {
         false
     }
 
+    fn transform(&self) -> Transform;
     fn state(&self) -> &RwLock<ModelState<T, H>>;
 }
 

@@ -75,6 +75,10 @@ impl<T: bytemuck::Pod + bytemuck::Zeroable, L: alloc::BufferAlloc<T> + Default> 
                 .write(queue, allocation.offset(), buffer_data.data);
         }
     }
+
+    pub fn get(&self, id: &str) -> Option<&Arc<L::Handle>> {
+        self.allocater.get(id)
+    }
 }
 
 impl<T: bytemuck::Pod + bytemuck::Zeroable, L: alloc::BufferDynamicAlloc<T>> Buffer<T, L> {
@@ -210,6 +214,10 @@ where
             self.index
                 .write(queue, allocation.offset(), buffer_data.indices);
         }
+    }
+
+    pub fn get(&self, id: &str) -> Option<&Arc<L::Handle>> {
+        self.allocater.get(id)
     }
 }
 

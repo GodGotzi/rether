@@ -16,6 +16,7 @@ use super::{
 #[derive(Debug)]
 pub struct BaseModel<T, H: AllocHandle<T>> {
     state: RwLock<ModelState<T, H>>,
+    transform: RwLock<crate::Transform>,
 }
 
 impl<T, H> BaseModel<T, H>
@@ -25,12 +26,14 @@ where
     pub fn simple(geometry: SimpleGeometry<T>) -> Self {
         Self {
             state: RwLock::new(ModelState::Dormant(geometry)),
+            transform: RwLock::new(crate::Transform::default()),
         }
     }
 
     pub fn indexed(geometry: IndexedGeometry<T>) -> Self {
         Self {
             state: RwLock::new(ModelState::DormantIndexed(geometry)),
+            transform: RwLock::new(crate::Transform::default()),
         }
     }
 }
@@ -42,6 +45,10 @@ where
 {
     fn wake(&self, handle: std::sync::Arc<StaticAllocHandle<T>>) {
         *self.state.write() = ModelState::Awake(handle);
+    }
+
+    fn transform(&self) -> crate::Transform {
+        self.transform.read().clone()
     }
 
     fn state(&self) -> &RwLock<ModelState<T, StaticAllocHandle<T>>> {
@@ -60,6 +67,10 @@ where
 {
     fn wake(&self, handle: std::sync::Arc<DynamicAllocHandle<T>>) {
         *self.state.write() = ModelState::Awake(handle);
+    }
+
+    fn transform(&self) -> crate::Transform {
+        self.transform.read().clone()
     }
 
     fn state(&self) -> &RwLock<ModelState<T, DynamicAllocHandle<T>>> {
@@ -95,12 +106,15 @@ where
 
                 let action = ModifyAction::new(0, handle.size(), mod_action);
 
+                self.transform.write().translate(translation);
                 handle.send_action(action).expect("Failed to send action");
             }
             ModelState::Dormant(ref mut geometry) => {
+                self.transform.write().translate(translation);
                 geometry.translate(translation);
             }
             ModelState::DormantIndexed(ref mut geometry) => {
+                self.transform.write().translate(translation);
                 geometry.translate(translation);
             }
             _ => panic!("Cannot translate a dead handle"),
@@ -120,12 +134,15 @@ where
 
                 let action = ModifyAction::new(0, handle.size(), mod_action);
 
+                self.transform.write().rotate(rotation);
                 handle.send_action(action).expect("Failed to send action");
             }
             ModelState::Dormant(ref mut geometry) => {
+                self.transform.write().rotate(rotation);
                 geometry.rotate(rotation);
             }
             ModelState::DormantIndexed(ref mut geometry) => {
+                self.transform.write().rotate(rotation);
                 geometry.rotate(rotation);
             }
             _ => panic!("Cannot rotate a dead handle"),
@@ -145,12 +162,15 @@ where
 
                 let action = ModifyAction::new(0, handle.size(), mod_action);
 
+                self.transform.write().scale(scale);
                 handle.send_action(action).expect("Failed to send action");
             }
             ModelState::Dormant(ref mut geometry) => {
+                self.transform.write().scale(scale);
                 geometry.scale(scale);
             }
             ModelState::DormantIndexed(ref mut geometry) => {
+                self.transform.write().scale(scale);
                 geometry.scale(scale);
             }
             _ => panic!("Cannot scale a dead handle"),

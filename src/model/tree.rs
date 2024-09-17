@@ -72,7 +72,9 @@ where
     }
 }
 
-impl<S, T> Model<T, StaticAllocHandle<T>> for TreeModel<S, T, StaticAllocHandle<T>> {
+impl<S: TranslateModel + RotateModel + ScaleModel, T: Translate + Rotate + Scale>
+    Model<T, StaticAllocHandle<T>> for TreeModel<S, T, StaticAllocHandle<T>>
+{
     fn wake(&self, handle: std::sync::Arc<StaticAllocHandle<T>>) {
         match self {
             Self::Root { state, .. } => {
@@ -80,6 +82,15 @@ impl<S, T> Model<T, StaticAllocHandle<T>> for TreeModel<S, T, StaticAllocHandle<
             }
             Self::Node { .. } | Self::Leaf { .. } => {
                 panic!("Cannot wake a node or leaf");
+            }
+        }
+    }
+
+    fn transform(&self) -> Transform {
+        match self {
+            Self::Root { transform, .. } => transform.read().clone(),
+            Self::Node { .. } | Self::Leaf { .. } => {
+                panic!("Cannot get transform from node or leaf")
             }
         }
     }
@@ -96,7 +107,9 @@ impl<S, T> Model<T, StaticAllocHandle<T>> for TreeModel<S, T, StaticAllocHandle<
     }
 }
 
-impl<S, T> Model<T, DynamicAllocHandle<T>> for TreeModel<S, T, DynamicAllocHandle<T>> {
+impl<S: TranslateModel + RotateModel + ScaleModel, T: Translate + Rotate + Scale>
+    Model<T, DynamicAllocHandle<T>> for TreeModel<S, T, DynamicAllocHandle<T>>
+{
     fn wake(&self, handle: std::sync::Arc<DynamicAllocHandle<T>>) {
         match self {
             Self::Root { state, .. } => {
@@ -104,6 +117,15 @@ impl<S, T> Model<T, DynamicAllocHandle<T>> for TreeModel<S, T, DynamicAllocHandl
             }
             Self::Node { .. } | Self::Leaf { .. } => {
                 panic!("Cannot wake a node or leaf");
+            }
+        }
+    }
+
+    fn transform(&self) -> Transform {
+        match self {
+            Self::Root { transform, .. } => transform.read().clone(),
+            Self::Node { .. } | Self::Leaf { .. } => {
+                panic!("Cannot get transform from node or leaf")
             }
         }
     }
