@@ -1,9 +1,11 @@
 use core::panic;
 
+use glam::Vec3;
 use parking_lot::RwLock;
 
 use crate::{
     alloc::{AllocHandle, DynamicAllocHandle, ModifyAction, StaticAllocHandle},
+    vertex::{Vertex, VertexRotator, VertexScaler},
     SimpleGeometry,
 };
 
@@ -38,12 +40,10 @@ where
     }
 }
 
-impl<T> Model<T, StaticAllocHandle<T>> for BaseModel<T, StaticAllocHandle<T>>
-where
-    T: Translate + Scale + Rotate,
-    // C: Translate + Scale + Rotate,
+impl Model<Vertex, StaticAllocHandle<Vertex>> for BaseModel<Vertex, StaticAllocHandle<Vertex>>
+// C: Translate + Scale + Rotate,
 {
-    fn wake(&self, handle: std::sync::Arc<StaticAllocHandle<T>>) {
+    fn wake(&self, handle: std::sync::Arc<StaticAllocHandle<Vertex>>) {
         *self.state.write() = ModelState::Awake(handle);
     }
 
@@ -51,7 +51,7 @@ where
         self.transform.read().clone()
     }
 
-    fn state(&self) -> &RwLock<ModelState<T, StaticAllocHandle<T>>> {
+    fn state(&self) -> &RwLock<ModelState<Vertex, StaticAllocHandle<Vertex>>> {
         &self.state
     }
 
@@ -60,12 +60,8 @@ where
     }
 }
 
-impl<T> Model<T, DynamicAllocHandle<T>> for BaseModel<T, DynamicAllocHandle<T>>
-where
-    T: Translate + Scale + Rotate,
-    // C: Translate + Scale + Rotate,
-{
-    fn wake(&self, handle: std::sync::Arc<DynamicAllocHandle<T>>) {
+impl Model<Vertex, DynamicAllocHandle<Vertex>> for BaseModel<Vertex, DynamicAllocHandle<Vertex>> {
+    fn wake(&self, handle: std::sync::Arc<DynamicAllocHandle<Vertex>>) {
         *self.state.write() = ModelState::Awake(handle);
     }
 
@@ -73,7 +69,7 @@ where
         self.transform.read().clone()
     }
 
-    fn state(&self) -> &RwLock<ModelState<T, DynamicAllocHandle<T>>> {
+    fn state(&self) -> &RwLock<ModelState<Vertex, DynamicAllocHandle<Vertex>>> {
         &self.state
     }
 
@@ -122,15 +118,16 @@ where
     }
 }
 
-impl<T, H> RotateModel for BaseModel<T, H>
+impl<H> RotateModel for BaseModel<Vertex, H>
 where
-    T: Rotate,
-    H: AllocHandle<T>,
+    H: AllocHandle<Vertex>,
 {
-    fn rotate(&self, rotation: glam::Quat) {
+    fn rotate(&self, rotation: glam::Quat, center: Option<Vec3>) {
         match &mut *self.state.write() {
             ModelState::Awake(ref mut handle) => {
-                let mod_action = Box::new(move |data: &mut [T]| data.rotate(rotation));
+                let mod_action = Box::new(move |data: &mut [Vertex]| {
+                    VertexRotator::new(data, center.unwrap_or(Vec3::ZERO)).rotate(rotation)
+                });
 
                 let action = ModifyAction::new(0, handle.size(), mod_action);
 
@@ -150,15 +147,16 @@ where
     }
 }
 
-impl<T, H> ScaleModel for BaseModel<T, H>
+impl<H> ScaleModel for BaseModel<Vertex, H>
 where
-    T: Scale,
-    H: AllocHandle<T>,
+    H: AllocHandle<Vertex>,
 {
-    fn scale(&self, scale: glam::Vec3) {
+    fn scale(&self, scale: glam::Vec3, center: Option<Vec3>) {
         match &mut *self.state.write() {
             ModelState::Awake(ref mut handle) => {
-                let mod_action = Box::new(move |data: &mut [T]| data.scale(scale));
+                let mod_action = Box::new(move |data: &mut [Vertex]| {
+                    VertexScaler::new(data, center.unwrap_or(Vec3::ZERO)).scale(scale);
+                });
 
                 let action = ModifyAction::new(0, handle.size(), mod_action);
 

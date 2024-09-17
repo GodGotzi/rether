@@ -54,7 +54,6 @@ impl Translate for Vertex {
 
 impl Rotate for Vertex {
     fn rotate(&mut self, rotation: glam::Quat) {
-        let rotation = glam::Mat3::from_quat(rotation);
         let position = glam::Vec3::from(self.position);
         let normal = glam::Vec3::from(self.normal);
 
@@ -68,5 +67,49 @@ impl Scale for Vertex {
         self.position[0] *= scale.x;
         self.position[1] *= scale.y;
         self.position[2] *= scale.z;
+    }
+}
+
+pub struct VertexRotator<'a, T> {
+    data: &'a mut [T],
+    center: glam::Vec3,
+}
+
+impl<'a, T> VertexRotator<'a, T> {
+    pub fn new(data: &'a mut [T], center: glam::Vec3) -> Self {
+        Self { data, center }
+    }
+}
+
+impl<'a> Rotate for VertexRotator<'a, Vertex> {
+    fn rotate(&mut self, rotation: glam::Quat) {
+        for vertex in self.data.iter_mut() {
+            let position = glam::Vec3::from(vertex.position);
+            let normal = glam::Vec3::from(vertex.normal);
+
+            vertex.position = (rotation * (position - self.center) + self.center).into();
+            vertex.normal = (rotation * normal).into();
+        }
+    }
+}
+
+pub struct VertexScaler<'a, T> {
+    data: &'a mut [T],
+    center: glam::Vec3,
+}
+
+impl<'a, T> VertexScaler<'a, T> {
+    pub fn new(data: &'a mut [T], center: glam::Vec3) -> Self {
+        Self { data, center }
+    }
+}
+
+impl<'a> Scale for VertexScaler<'a, Vertex> {
+    fn scale(&mut self, scale: glam::Vec3) {
+        for vertex in self.data.iter_mut() {
+            let position = glam::Vec3::from(vertex.position);
+
+            vertex.position = ((position - self.center) * scale + self.center).into();
+        }
     }
 }

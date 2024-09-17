@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use geometry::IndexedGeometry;
+use glam::Vec3;
 use parking_lot::RwLock;
 
 use crate::{alloc::AllocHandle, Rotate, Scale, SimpleGeometry, Transform, Translate};
@@ -54,11 +55,11 @@ pub trait TranslateModel {
 }
 
 pub trait RotateModel {
-    fn rotate(&self, rotation: glam::Quat);
+    fn rotate(&self, rotation: glam::Quat, center: Option<Vec3>);
 }
 
 pub trait ScaleModel {
-    fn scale(&self, scale: glam::Vec3);
+    fn scale(&self, scale: glam::Vec3, center: Option<Vec3>);
 }
 
 pub trait TransformModel: TranslateModel + RotateModel + ScaleModel {}
@@ -72,6 +73,11 @@ pub trait Model<T: Translate + Rotate + Scale, H: AllocHandle<T>>:
     fn is_destroyed(&self) -> bool {
         false
     }
+
+    fn center(&self) -> Option<glam::Vec3> {
+        None
+    }
+
     fn transform(&self) -> Transform;
     fn state(&self) -> &RwLock<ModelState<T, H>>;
 }
@@ -85,6 +91,9 @@ pub trait IndexedModel<T: Translate + Rotate + Scale, H: AllocHandle<T>>:
         false
     }
 
+    fn center(&self) -> Option<glam::Vec3> {
+        None
+    }
     fn transform(&self) -> Transform;
     fn state(&self) -> &RwLock<ModelState<T, H>>;
 }

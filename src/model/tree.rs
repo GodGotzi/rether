@@ -1,10 +1,12 @@
 use core::panic;
 
+use glam::Vec3;
 use parking_lot::RwLock;
 
 use crate::{
     alloc::{AllocHandle, DynamicAllocHandle, ModifyAction, StaticAllocHandle},
     model::{BufferLocation, Model, ModelState},
+    vertex::{Vertex, VertexRotator, VertexScaler},
     Rotate, Scale, Transform, Translate,
 };
 
@@ -72,10 +74,10 @@ where
     }
 }
 
-impl<S: TranslateModel + RotateModel + ScaleModel, T: Translate + Rotate + Scale>
-    Model<T, StaticAllocHandle<T>> for TreeModel<S, T, StaticAllocHandle<T>>
+impl<S: TranslateModel + RotateModel + ScaleModel> Model<Vertex, StaticAllocHandle<Vertex>>
+    for TreeModel<S, Vertex, StaticAllocHandle<Vertex>>
 {
-    fn wake(&self, handle: std::sync::Arc<StaticAllocHandle<T>>) {
+    fn wake(&self, handle: std::sync::Arc<StaticAllocHandle<Vertex>>) {
         match self {
             Self::Root { state, .. } => {
                 *state.write() = ModelState::Awake(handle);
@@ -95,7 +97,7 @@ impl<S: TranslateModel + RotateModel + ScaleModel, T: Translate + Rotate + Scale
         }
     }
 
-    fn state(&self) -> &RwLock<ModelState<T, StaticAllocHandle<T>>> {
+    fn state(&self) -> &RwLock<ModelState<Vertex, StaticAllocHandle<Vertex>>> {
         match self {
             Self::Root { state, .. } => state,
             Self::Node { .. } | Self::Leaf { .. } => panic!("Cannot get state from node or leaf"),
@@ -107,10 +109,10 @@ impl<S: TranslateModel + RotateModel + ScaleModel, T: Translate + Rotate + Scale
     }
 }
 
-impl<S: TranslateModel + RotateModel + ScaleModel, T: Translate + Rotate + Scale>
-    Model<T, DynamicAllocHandle<T>> for TreeModel<S, T, DynamicAllocHandle<T>>
+impl<S: TranslateModel + RotateModel + ScaleModel> Model<Vertex, DynamicAllocHandle<Vertex>>
+    for TreeModel<S, Vertex, DynamicAllocHandle<Vertex>>
 {
-    fn wake(&self, handle: std::sync::Arc<DynamicAllocHandle<T>>) {
+    fn wake(&self, handle: std::sync::Arc<DynamicAllocHandle<Vertex>>) {
         match self {
             Self::Root { state, .. } => {
                 *state.write() = ModelState::Awake(handle);
@@ -130,7 +132,7 @@ impl<S: TranslateModel + RotateModel + ScaleModel, T: Translate + Rotate + Scale
         }
     }
 
-    fn state(&self) -> &RwLock<ModelState<T, DynamicAllocHandle<T>>> {
+    fn state(&self) -> &RwLock<ModelState<Vertex, DynamicAllocHandle<Vertex>>> {
         match self {
             Self::Root { state, .. } => state,
             Self::Node { .. } | Self::Leaf { .. } => panic!("Cannot get state from node or leaf"),
@@ -214,8 +216,8 @@ impl<S: TranslateModel, T: Translate, H: AllocHandle<T>> TranslateModel for Tree
     }
 }
 
-impl<S: RotateModel, T: Rotate, H: AllocHandle<T>> RotateModel for TreeModel<S, T, H> {
-    fn rotate(&self, rotation: glam::Quat) {
+impl<S: RotateModel, H: AllocHandle<Vertex>> RotateModel for TreeModel<S, Vertex, H> {
+    fn rotate(&self, rotation: glam::Quat, center: Option<glam::Vec3>) {
         match self {
             Self::Root {
                 state,
@@ -226,28 +228,31 @@ impl<S: RotateModel, T: Rotate, H: AllocHandle<T>> RotateModel for TreeModel<S, 
                 transform.write().rotate(rotation);
                 match &mut *state.write() {
                     ModelState::Awake(handle) => {
-                        let mod_action = Box::new(move |data: &mut [T]| data.rotate(rotation));
+                        let mod_action = Box::new(move |data: &mut [Vertex]| {
+                            //data.rotate(rotation);
+                            VertexRotator::new(data, center.unwrap_or(Vec3::ZERO)).rotate(rotation);
+                        });
 
                         let action = ModifyAction::new(0, handle.size(), mod_action);
 
                         handle.send_action(action).expect("Failed to send action");
 
                         for handle in sub_handles.iter() {
-                            handle.rotate(rotation);
+                            handle.rotate(rotation, center);
                         }
                     }
                     ModelState::Dormant(geometry) => {
                         geometry.rotate(rotation);
 
                         for handle in sub_handles.iter() {
-                            handle.rotate(rotation);
+                            handle.rotate(rotation, center);
                         }
                     }
                     ModelState::DormantIndexed(geometry) => {
                         geometry.rotate(rotation);
 
                         for handle in sub_handles.iter() {
-                            handle.rotate(rotation);
+                            handle.rotate(rotation, center);
                         }
                     }
                     _ => panic!("Cannot rotate a dead handle"),
@@ -255,7 +260,7 @@ impl<S: RotateModel, T: Rotate, H: AllocHandle<T>> RotateModel for TreeModel<S, 
             }
             Self::Node { sub_handles, .. } => {
                 for handle in sub_handles.iter() {
-                    handle.rotate(rotation);
+                    handle.rotate(rotation, center);
                 }
             }
             _ => {}
@@ -263,8 +268,8 @@ impl<S: RotateModel, T: Rotate, H: AllocHandle<T>> RotateModel for TreeModel<S, 
     }
 }
 
-impl<S: ScaleModel, T: Scale, H: AllocHandle<T>> ScaleModel for TreeModel<S, T, H> {
-    fn scale(&self, scale: glam::Vec3) {
+impl<S: ScaleModel, H: AllocHandle<Vertex>> ScaleModel for TreeModel<S, Vertex, H> {
+    fn scale(&self, scale: glam::Vec3, center: Option<glam::Vec3>) {
         match self {
             Self::Root {
                 state,
@@ -275,28 +280,30 @@ impl<S: ScaleModel, T: Scale, H: AllocHandle<T>> ScaleModel for TreeModel<S, T, 
                 transform.write().scale(scale);
                 match &mut *state.write() {
                     ModelState::Awake(handle) => {
-                        let mod_action = Box::new(move |data: &mut [T]| data.scale(scale));
+                        let mod_action = Box::new(move |data: &mut [Vertex]| {
+                            VertexScaler::new(data, center.unwrap_or(Vec3::ZERO)).scale(scale);
+                        });
 
                         let action = ModifyAction::new(0, handle.size(), mod_action);
 
                         handle.send_action(action).expect("Failed to send action");
 
                         for handle in sub_handles.iter() {
-                            handle.scale(scale);
+                            handle.scale(scale, center);
                         }
                     }
                     ModelState::Dormant(geometry) => {
                         geometry.scale(scale);
 
                         for handle in sub_handles.iter() {
-                            handle.scale(scale);
+                            handle.scale(scale, center);
                         }
                     }
                     ModelState::DormantIndexed(geometry) => {
                         geometry.scale(scale);
 
                         for handle in sub_handles.iter() {
-                            handle.scale(scale);
+                            handle.scale(scale, center);
                         }
                     }
                     _ => panic!("Cannot scale a dead handle"),
@@ -304,7 +311,7 @@ impl<S: ScaleModel, T: Scale, H: AllocHandle<T>> ScaleModel for TreeModel<S, T, 
             }
             Self::Node { sub_handles, .. } => {
                 for handle in sub_handles.iter() {
-                    handle.scale(scale);
+                    handle.scale(scale, center);
                 }
             }
             _ => {}
