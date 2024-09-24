@@ -8,6 +8,7 @@ use alloc::{AllocHandle, DynamicAllocHandle};
 use raw::*;
 use wgpu::{Device, Queue};
 
+#[derive(Debug)]
 pub struct BufferData<'a, T> {
     data: &'a [T],
 }
@@ -18,6 +19,7 @@ impl<'a, T> BufferData<'a, T> {
     }
 }
 
+#[derive(Debug)]
 pub struct IndexedBufferData<'a, T> {
     data: &'a [T],
     indices: &'a [u32],
