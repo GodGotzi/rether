@@ -1,5 +1,6 @@
 /// A vertex is a single point. A geometry is typically composed of multiple vertecies.
 use bytemuck::Zeroable;
+use glam::Vec3;
 
 use crate::{model::transform::Translate, Rotate, Scale};
 
@@ -53,7 +54,7 @@ impl Translate for Vertex {
 }
 
 impl Rotate for Vertex {
-    fn rotate(&mut self, rotation: glam::Quat) {
+    fn rotate(&mut self, rotation: glam::Quat, _center: Vec3) {
         let position = glam::Vec3::from(self.position);
         let normal = glam::Vec3::from(self.normal);
 
@@ -72,22 +73,21 @@ impl Scale for Vertex {
 
 pub struct VertexRotator<'a, T> {
     data: &'a mut [T],
-    center: glam::Vec3,
 }
 
 impl<'a, T> VertexRotator<'a, T> {
-    pub fn new(data: &'a mut [T], center: glam::Vec3) -> Self {
-        Self { data, center }
+    pub fn new(data: &'a mut [T]) -> Self {
+        Self { data }
     }
 }
 
 impl<'a> Rotate for VertexRotator<'a, Vertex> {
-    fn rotate(&mut self, rotation: glam::Quat) {
+    fn rotate(&mut self, rotation: glam::Quat, center: Vec3) {
         for vertex in self.data.iter_mut() {
             let position = glam::Vec3::from(vertex.position);
             let normal = glam::Vec3::from(vertex.normal);
 
-            vertex.position = (rotation * (position - self.center) + self.center).into();
+            vertex.position = (rotation * (position - center) + center).into();
             vertex.normal = (rotation * normal).into();
         }
     }

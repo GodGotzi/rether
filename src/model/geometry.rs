@@ -1,4 +1,9 @@
-use crate::buffer::{BufferData, IndexedBufferData};
+use glam::Vec3;
+
+use crate::{
+    buffer::{BufferData, IndexedBufferData},
+    vertex::{Vertex, VertexRotator},
+};
 
 use super::{
     transform::{Rotate, Scale, Translate},
@@ -13,11 +18,9 @@ impl<T: Translate> Translate for [T] {
     }
 }
 
-impl<T: Rotate> Rotate for [T] {
-    fn rotate(&mut self, rotation: glam::Quat) {
-        for item in self.iter_mut() {
-            item.rotate(rotation);
-        }
+impl Rotate for [Vertex] {
+    fn rotate(&mut self, rotation: glam::Quat, center: Vec3) {
+        VertexRotator::new(self).rotate(rotation, center);
     }
 }
 
@@ -82,9 +85,9 @@ impl<T: Translate> Translate for SimpleGeometry<T> {
     }
 }
 
-impl<T: Rotate> Rotate for SimpleGeometry<T> {
-    fn rotate(&mut self, rotation: glam::Quat) {
-        self.vertices.rotate(rotation)
+impl Rotate for SimpleGeometry<Vertex> {
+    fn rotate(&mut self, rotation: glam::Quat, center: Vec3) {
+        self.vertices.rotate(rotation, center)
     }
 }
 
@@ -154,9 +157,9 @@ impl<T: Translate> Translate for IndexedGeometry<T> {
     }
 }
 
-impl<T: Rotate> Rotate for IndexedGeometry<T> {
-    fn rotate(&mut self, rotation: glam::Quat) {
-        self.vertices.rotate(rotation)
+impl Rotate for IndexedGeometry<Vertex> {
+    fn rotate(&mut self, rotation: glam::Quat, center: Vec3) {
+        self.vertices.rotate(rotation, center)
     }
 }
 

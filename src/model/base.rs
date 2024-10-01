@@ -126,21 +126,27 @@ where
         match &mut *self.state.write() {
             ModelState::Awake(ref mut handle) => {
                 let mod_action = Box::new(move |data: &mut [Vertex]| {
-                    VertexRotator::new(data, center.unwrap_or(Vec3::ZERO)).rotate(rotation)
+                    VertexRotator::new(data).rotate(rotation, center.unwrap_or(Vec3::ZERO))
                 });
 
                 let action = ModifyAction::new(0, handle.size(), mod_action);
 
-                self.transform.write().rotate(rotation);
+                self.transform
+                    .write()
+                    .rotate(rotation, center.unwrap_or(Vec3::ZERO));
                 handle.send_action(action).expect("Failed to send action");
             }
             ModelState::Dormant(ref mut geometry) => {
-                self.transform.write().rotate(rotation);
-                geometry.rotate(rotation);
+                self.transform
+                    .write()
+                    .rotate(rotation, center.unwrap_or(Vec3::ZERO));
+                geometry.rotate(rotation, center.unwrap_or(Vec3::ZERO));
             }
             ModelState::DormantIndexed(ref mut geometry) => {
-                self.transform.write().rotate(rotation);
-                geometry.rotate(rotation);
+                self.transform
+                    .write()
+                    .rotate(rotation, center.unwrap_or(Vec3::ZERO));
+                geometry.rotate(rotation, center.unwrap_or(Vec3::ZERO));
             }
             _ => panic!("Cannot rotate a dead handle"),
         }

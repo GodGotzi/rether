@@ -225,12 +225,14 @@ impl<S: RotateModel, H: AllocHandle<Vertex>> RotateModel for TreeModel<S, Vertex
                 transform,
                 ..
             } => {
-                transform.write().rotate(rotation);
+                transform
+                    .write()
+                    .rotate(rotation, center.unwrap_or(Vec3::ZERO));
                 match &mut *state.write() {
                     ModelState::Awake(handle) => {
                         let mod_action = Box::new(move |data: &mut [Vertex]| {
                             //data.rotate(rotation);
-                            VertexRotator::new(data, center.unwrap_or(Vec3::ZERO)).rotate(rotation);
+                            VertexRotator::new(data).rotate(rotation, center.unwrap_or(Vec3::ZERO));
                         });
 
                         let action = ModifyAction::new(0, handle.size(), mod_action);
@@ -242,14 +244,14 @@ impl<S: RotateModel, H: AllocHandle<Vertex>> RotateModel for TreeModel<S, Vertex
                         }
                     }
                     ModelState::Dormant(geometry) => {
-                        geometry.rotate(rotation);
+                        geometry.rotate(rotation, center.unwrap_or(Vec3::ZERO));
 
                         for handle in sub_handles.iter() {
                             handle.rotate(rotation, center);
                         }
                     }
                     ModelState::DormantIndexed(geometry) => {
-                        geometry.rotate(rotation);
+                        geometry.rotate(rotation, center.unwrap_or(Vec3::ZERO));
 
                         for handle in sub_handles.iter() {
                             handle.rotate(rotation, center);
