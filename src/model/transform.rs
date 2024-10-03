@@ -1,4 +1,4 @@
-use glam::{Mat4, Vec3};
+use glam::Mat4;
 
 #[derive(Debug, Clone)]
 pub struct Transform {
@@ -22,7 +22,7 @@ pub trait Translate {
 }
 
 pub trait Rotate {
-    fn rotate(&mut self, rotation: glam::Quat, center: Vec3);
+    fn rotate(&mut self, rotation: glam::Quat);
 }
 
 pub trait Scale {
@@ -36,7 +36,7 @@ impl Translate for Transform {
 }
 
 impl Rotate for Transform {
-    fn rotate(&mut self, rotation: glam::Quat, _center: Vec3) {
+    fn rotate(&mut self, rotation: glam::Quat) {
         self.rotation = rotation * self.rotation;
     }
 }

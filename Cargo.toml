@@ -12,6 +12,7 @@ parking_lot = "0.12.1"
 winit = "0.30.4"
 pollster = "0.3.0"
 flume = "0.11.0"
+rayon = "1.10.0"
 
 [[bin]]
 name = "rether"

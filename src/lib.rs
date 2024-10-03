@@ -7,6 +7,7 @@ pub mod vertex;
 
 pub use buffer::Buffer;
 pub use buffer::IndexedBuffer;
+pub use buffer::RawBuffer;
 
 pub use buffer::alloc;
 

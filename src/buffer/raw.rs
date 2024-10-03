@@ -3,12 +3,11 @@ use wgpu::{BufferAddress, BufferDescriptor};
 
 #[derive(Debug)]
 pub struct RawBuffer {
-    pub inner: wgpu::Buffer,
-    pub render_range: std::ops::Range<u32>,
-
+    pub(crate) inner: wgpu::Buffer,
+    pub(crate) render_range: std::ops::Range<u32>,
     usage: wgpu::BufferUsages,
 
-    pub size: BufferAddress,
+    pub(crate) size: BufferAddress,
     label: String,
 }
 

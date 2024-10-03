@@ -1,11 +1,13 @@
 pub mod alloc;
+mod model;
 mod raw;
+
+pub use raw::RawBuffer;
 
 use std::sync::Arc;
 
 use alloc::{AllocHandle, DynamicAllocHandle};
 
-use raw::*;
 use wgpu::{Device, Queue};
 
 #[derive(Debug)]
